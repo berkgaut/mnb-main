@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+# Startup script to run mnb outside of container (requires python3)
+
+if [ ! -d ./mnb-main/venv ]
+then
+    mkdir ./mnb-main/venv
+    virtualenv ./mnb-main/venv
+fi
+
+if [ -f ./mnb-main/venv/bin/activate ]
+then
+    source ./mnb-main/venv/bin/activate
+elif [ -f  ./mnb-main/venv/Scripts/activate ] # Bash under Windows
+then
+    source  ./mnb-main/venv/Scripts/activate
+else
+    echo "Could not find virtualenv activation script"
+    exit 1
+fi
+
+pip3 install -r ./mnb-main/requirements.txt
+
+if [ -S /var/run/docker.sock ]
+then
+	docker_host=
+else
+	docker_host=tcp://localhost:2375
+fi
+
+env \
+  DOCKER_HOST=$docker_host \
+  PYTHONPATH=./mnb-main \
+python mnb-plan.py $*
+
+

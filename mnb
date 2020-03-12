@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+IMAGE_VERSION=0.1
+
+if [ -S /var/run/docker.sock ]
+then
+    docker_host=
+    docker_sock_mount="-v /var/run/docker.sock:/var/run/docker.sock"
+else
+    docker_host=tcp://host.docker.internal:2375
+    docker_sock_mount=
+fi
+
+docker run \
+  --env DOCKER_HOST=${docker_host} \
+  ${docker_sock_mount} \
+  -v "${PWD}:/mnb/run" \
+  --rm \
+  bberkgaut/mnb:${IMAGE_VERSION} \
+  python3 mnb-plan.py --rootabspath "${PWD}" $*

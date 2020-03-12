@@ -1,0 +1,32 @@
+## Artifacts
+*.class
+
+## Package Files
+*.jar
+*.war
+*.ear
+target
+
+## IntelliJ
+.idea
+*.iml
+
+/.vscode
+
+## Logs
+*.log
+
+## Temp
+*~
+.#*
+
+## MAC
+.DS_Store
+
+dependency-reduced-pom.xml
+
+mnb-main/venv/
+.mnb.d
+
+__pycache__
+*.pyc
