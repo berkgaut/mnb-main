@@ -51,7 +51,7 @@ class BuildImage(object):
             INFO("Building " + self.name)
             (image, logs) = client.images.build(path=self.path,
                                                 tag=self.name,
-                                                rm=True)
+                                                rm=False)
             for line in logs:
                 INFO(line)
 

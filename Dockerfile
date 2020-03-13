@@ -12,6 +12,7 @@ ENV PYTHONPATH=/mnb/lib
 
 WORKDIR /mnb/run
 
+RUN mkdir /mnb/lib/scripts
+ADD scripts/* /mnb/lib/scripts/
+
 ADD mnb-main/mnb/*.py /mnb/lib/mnb/
-
-

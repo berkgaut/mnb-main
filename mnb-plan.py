@@ -1,10 +1,8 @@
 import os
 from mnb import *
 
-IMAGE_VERSION="0.1"
-
 def build_plan(p):
-    p.build_image("bberkgaut/mnb:%s" % IMAGE_VERSION, ".")
+    p.build_image("bberkgaut/mnb:%s" % MNB_VERSION, ".")
     for (dir, dirs, filenames) in os.walk("."):
         dirpath = Path(dir)
         if ignore(dirpath):
