@@ -15,4 +15,4 @@ docker run \
   -v "${PWD}:/mnb/run" \
   --rm \
   bberkgaut/mnb:MNB_VERSION \
-  python3 mnb-plan.py --rootabspath "${PWD}" $*
+  --rootabspath "${PWD}" $*

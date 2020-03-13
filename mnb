@@ -14,5 +14,5 @@ docker run \
   ${docker_sock_mount} \
   -v "${PWD}:/mnb/run" \
   --rm \
-  bberkgaut/mnb:0.2.3 \
-  python3 mnb-plan.py --rootabspath "${PWD}" $*
+  bberkgaut/mnb:0.3.0 \
+  --rootabspath "${PWD}" $*
