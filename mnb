@@ -14,5 +14,6 @@ docker run \
   ${docker_sock_mount} \
   -v "${PWD}:/mnb/run" \
   --rm \
-  bberkgaut/mnb:0.3.0 \
-  --rootabspath "${PWD}" $*
+  bberkgaut/mnb:0.5.2 \
+  --rootabspath "${PWD}" \
+  $*

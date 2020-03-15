@@ -31,6 +31,6 @@ fi
 env \
   DOCKER_HOST=$docker_host \
   PYTHONPATH=./mnb-main \
-python mnb-plan.py $*
+python mnb-main/mnb/climain.py --dev-mode $*
 
 

@@ -15,4 +15,5 @@ docker run \
   -v "${PWD}:/mnb/run" \
   --rm \
   bberkgaut/mnb:MNB_VERSION \
-  --rootabspath "${PWD}" $*
+  --rootabspath "${PWD}" \
+  $*

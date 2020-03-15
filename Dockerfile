@@ -11,7 +11,7 @@ RUN pip3 install -r /mnb/lib/mnb/requirements.txt
 ENV PYTHONPATH=/mnb/lib
 
 WORKDIR /mnb/run
-ENTRYPOINT [ "/usr/local/bin/python3", "mnb-plan.py" ]
+ENTRYPOINT [ "/usr/local/bin/python3", "/mnb/lib/mnb/climain.py" ]
 
 RUN mkdir /mnb/lib/scripts
 ADD scripts/* /mnb/lib/scripts/
