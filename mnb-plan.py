@@ -3,6 +3,7 @@ from mnb import *
 
 def build_plan(p):
     p.build_image("bberkgaut/mnb:%s" % MNB_VERSION, ".")
+    p.build_image("bberkgaut/mnb-plantuml:0.0.1", "containers/plantuml")
     for (dir, dirs, filenames) in os.walk("."):
         dirpath = Path(dir)
         if ignore(dirpath):

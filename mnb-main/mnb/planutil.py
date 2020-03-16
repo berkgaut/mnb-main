@@ -36,7 +36,7 @@ def md2pdf(p, source):
                           src_file.workpath()])
 
 def plantuml2png(p, source):
-    plantuml_image = p.build_image("mnb/plantuml:1.2019.11", "containers/plantuml")
+    plantuml_image = p.registrry_image("bberkgaut/mnb-plantuml:0.0.1")
     src_file, dst_file = src_dst(p, source, ".png")
     p.transform(sources=[src_file],
                 targets=[dst_file],
