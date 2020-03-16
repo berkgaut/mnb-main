@@ -1,5 +1,5 @@
 REM
-REM Startup script for mnb utility, see https://github.com/berkgaut/mnb-main 
+REM Startup script for mnb utility, see https://github.com/berkgaut/mnb-main
 REM
 REM ##########################################################################
 REM
