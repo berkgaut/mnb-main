@@ -58,7 +58,7 @@ def scripts(ns):
                     c = i.read().replace("MNB_VERSION", MNB_VERSION)
                     o.write(c)
                 if setx:
-                    Path(dst_dir_path / name).chmod(755)
+                    Path(dst_dir_path / name).chmod(0o755)
 
 def main():
     parser = argparse.ArgumentParser(prog='mnb')
