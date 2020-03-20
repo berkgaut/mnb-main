@@ -42,3 +42,18 @@ def plantuml2png(p, source):
                 targets=[dst_file],
                 image=plantuml_image,
                 command=["-v", "-o", dst_file.workdir(), "-tpng",  src_file.workpath()])
+
+DEFAULT_IGNORE_DIRS = [".mnb.d", ".git", "__pycache__"]
+
+def walk_files(p, dir, ignore_dirs, visitor, context = None):
+    def walk_files_1(dir_path : Path):
+        if not dir_path.is_dir():
+            raise Exception("%s is not a directory" % dir_path)
+        for path in dir_path.iterdir():
+            if path.is_dir() and not path.name in ignore_dirs:
+                walk_files_1(path)
+            elif path.is_file():
+                visitor(p, context, path)
+    walk_files_1(Path(dir))
+
+    
