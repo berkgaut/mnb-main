@@ -1,5 +1,17 @@
 from pathlib import Path, PurePosixPath
 
+def pandoc_image(p):
+    return p.registry_image("dalibo/pandocker")
+
+def plantuml_image(p):
+    return p.registrry_image("bberkgaut/mnb-plantuml:0.0.1")
+
+def jq_image(p):
+    return p.registry_image("imega/jq")
+
+def mysql_client_image(p):
+    return p.registry_image("imega/mysql-client")
+
 def src_dst(p, source, dstsuffix):
     src_path = PurePosixPath(source)
     src_file = p.src_file(source, through_file=src_path.name)
@@ -8,24 +20,22 @@ def src_dst(p, source, dstsuffix):
     return (src_file, dst_file)
 
 def md2html(p, source, extra=[]):
-    pandoc_image   = p.registry_image("dalibo/pandocker")
     src_file, dst_file = src_dst(p, source, ".html")
     extras_deps = [p.src_file(f, through_file=Path(f).name) for f in extra]
     p.transform(sources=extras_deps + [src_file],
                 targets=[dst_file],
-                image=pandoc_image,
+                image=pandoc_image(p),
                 command=["-f", "markdown",
-                          "-t", "html5",
-                          "--standalone",
-                          "-o", dst_file.workpath(),
-                          src_file.workpath()])
+                         "-t", "html5",
+                         "--standalone",
+                         "-o", dst_file.workpath(),
+                         src_file.workpath()])
 
 def md2pdf(p, source):
-    pandoc_image   = p.registry_image("dalibo/pandocker")
     src_file, dst_file = src_dst(p, source, ".pdf")
     p.transform(sources=[src_file],
                 targets=[dst_file],
-                image=pandoc_image,
+                image=pandoc_image(p),
                 command=["-f", "markdown",
                           "-t", "latex",
                           "--pdf-engine=xelatex",
@@ -36,11 +46,10 @@ def md2pdf(p, source):
                           src_file.workpath()])
 
 def plantuml2png(p, source):
-    plantuml_image = p.registrry_image("bberkgaut/mnb-plantuml:0.0.1")
     src_file, dst_file = src_dst(p, source, ".png")
     p.transform(sources=[src_file],
                 targets=[dst_file],
-                image=plantuml_image,
+                image=plantuml_image(p),
                 command=["-v", "-o", dst_file.workdir(), "-tpng",  src_file.workpath()])
 
 DEFAULT_IGNORE_DIRS = [".mnb.d", ".git", "__pycache__"]
