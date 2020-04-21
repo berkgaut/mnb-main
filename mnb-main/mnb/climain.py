@@ -1,5 +1,4 @@
 import os
-import sys
 import argparse
 from inspect import signature
 from pathlib import PureWindowsPath
@@ -40,11 +39,19 @@ def showplan(ns, plan_builder):
     p = mkplan(ns, plan_builder)
     p.show()
 
+def argparse_test(ns):
+    print(ns)
+
+def run_extension(ns, plan_builder):
+    p = mkplan(ns, plan_builder)
+    print("run extension: %s", ns.extension_args)
+
 def scripts(ns):
     if ns.dev_mode:
         src_dir_path = Path("scripts")
         dst_dir_path = Path(".")
     else:
+        from pathlib import PosixPath
         src_dir_path = PosixPath("/mnb/lib/scripts")
         dst_dir_path = PosixPath("/mnb/run")
     for name, overwrite, setx in [("mnb", True, True),
@@ -61,46 +68,47 @@ def scripts(ns):
                     Path(dst_dir_path / name).chmod(0o755)
 
 def main():
-    parser = argparse.ArgumentParser(prog='mnb')
-    parser.add_argument('--rootabspath', nargs='?', help="Absolute path to working context on host machine")
-    parser.add_argument('--windows-host', action='store_true', help="host machine is running Windows (by default Unix-like system is assumed)")
-    parser.add_argument('--argparse-test', action='store_true', help="dry run, print command-line parsing result")
-    parser.add_argument('--plan-file', default="mnb-plan.py", help="path to plan description")
-    parser.add_argument('--dev-mode', action='store_true', help="Development mode (run outside of a container)")
-    parser.set_defaults(func=update)
-    subparsers = parser.add_subparsers()
+    cmdline_args = sys.argv[1:]
 
-    parser_update = subparsers.add_parser("update")
-    parser_update.set_defaults(func=update)
+    root_parser = argparse.ArgumentParser(prog='mnb')
+    root_parser.add_argument('--rootabspath', nargs='?', help="Absolute path to working context on host machine")
+    root_parser.add_argument('--windows-host', action='store_true', help="host machine is running Windows (by default Unix-like system is assumed)")
+    root_parser.add_argument('--plan-file', default="mnb-plan.py", help="path to plan description")
+    root_parser.add_argument('--dev-mode', action='store_true', help="Development mode (run outside of a container)")
 
-    parser_clean = subparsers.add_parser("clean")
-    parser_clean.set_defaults(func=clean)
+    root_ns, rest = root_parser.parse_known_args(cmdline_args)
 
-    parser_showplan = subparsers.add_parser("showplan")
-    parser_showplan.set_defaults(func=showplan)
-
-    parser_scripts = subparsers.add_parser("scripts")
-    parser_scripts.set_defaults(func=scripts)
-
-    ns = parser.parse_args(sys.argv[1:])
-    if ns.argparse_test:
-        print(ns)
-        exit(0)
+    if len(rest) == 0:
+        # default action: update
+        root_ns.func = update
+    elif rest[0] == "update":
+        root_ns.func = update
+    elif rest[0] == "clean":
+        root_ns.func = clean
+    elif rest[0] == "showplan":
+        root_ns.func = showplan
+    elif rest[0] == "scripts":
+        root_ns.func = scripts
+    elif rest[0] == "argparse-test":
+        root_ns.func = argparse_test
     else:
-        n_args = len(signature(ns.func).parameters)
-        if n_args == 1:
-            ns.func(ns)
-        elif n_args == 2:
-            plan_file_path = Path(ns.plan_file)
-            if not plan_file_path.exists():
-                raise Exception("Plan file %s does not exist" % plan_file_path)
-            plan_env = dict()
-            exec(plan_file_path.open("r").read(), plan_env)
-            BUILD_PLAN = 'build_plan'
-            if not BUILD_PLAN in plan_env:
-                raise Exception("Function %s not defined in plan file %s" % (BUILD_PLAN, plan_file_path))
-            plan_builder = plan_env[BUILD_PLAN]
-            ns.func(ns, plan_builder)
+        root_ns.func = run_extension
+        root_ns.extension_args = rest
+
+    n_func_params = len(signature(root_ns.func).parameters)
+    if n_func_params == 1:
+        root_ns.func(root_ns)
+    elif n_func_params == 2:
+        plan_file_path = Path(root_ns.plan_file)
+        if not plan_file_path.exists():
+            raise Exception("Plan file %s does not exist" % plan_file_path)
+        plan_env = dict()
+        exec(plan_file_path.open("r").read(), plan_env)
+        BUILD_PLAN = 'build_plan'
+        if not BUILD_PLAN in plan_env:
+            raise Exception("Function %s not defined in plan file %s" % (BUILD_PLAN, plan_file_path))
+        plan_builder = plan_env[BUILD_PLAN]
+        root_ns.func(root_ns, plan_builder)
 
 if __name__=="__main__":
     main()

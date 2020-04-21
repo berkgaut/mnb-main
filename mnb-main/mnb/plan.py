@@ -1,7 +1,7 @@
 import io
 import shutil
 import threading
-from pathlib import Path, PurePosixPath, PosixPath
+from pathlib import Path, PurePosixPath
 
 from docker.types import Mount
 
