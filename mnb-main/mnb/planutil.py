@@ -4,7 +4,7 @@ def pandoc_image(p):
     return p.registry_image("dalibo/pandocker")
 
 def plantuml_image(p):
-    return p.registrry_image("bberkgaut/mnb-plantuml:0.0.1")
+    return p.registry_image("bberkgaut/mnb-plantuml:0.0.1")
 
 def jq_image(p):
     return p.registry_image("imega/jq")
