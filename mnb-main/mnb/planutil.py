@@ -52,6 +52,13 @@ def plantuml2png(p, source):
                 image=plantuml_image(p),
                 command=["-v", "-o", dst_file.workdir(), "-tpng",  src_file.workpath()])
 
+def plantuml2pdf(p, source):
+    src_file, dst_file = src_dst(p, source, ".pdf")
+    p.transform(sources=[src_file],
+                targets=[dst_file],
+                image=plantuml_image(p),
+                command=["-v", "-o", dst_file.workdir(), "-tpdf",  src_file.workpath()])
+
 DEFAULT_IGNORE_DIRS = [".mnb.d", ".git", "__pycache__"]
 
 def walk_files(p, dir, ignore_dirs, visitor, context = None):
