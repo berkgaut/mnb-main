@@ -7,7 +7,7 @@ set -o errexit
 if [ ! -d ./mnb-main/venv ]
 then
     mkdir ./mnb-main/venv
-    virtualenv ./mnb-main/venv || (rm -rf ./mnb-main/venv; exit 1)
+    python3 -m venv ./mnb-main/venv || (rm -rf ./mnb-main/venv; exit 1)
 fi
 
 if [ -f ./mnb-main/venv/bin/activate ]
@@ -24,7 +24,7 @@ else
     exit 1
 fi
 
-pip3 install -r ./mnb-main/requirements.txt
+python3 -m pip install -r ./mnb-main/requirements.txt
 
 if [ -S /var/run/docker.sock ]
 then
@@ -36,6 +36,6 @@ fi
 env \
   DOCKER_HOST=$docker_host \
   PYTHONPATH=./mnb-main \
-python mnb-main/mnb/climain.py --dev-mode $*
+python3 mnb-main/mnb/climain.py --dev-mode $*
 
 
