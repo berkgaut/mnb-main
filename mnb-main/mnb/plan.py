@@ -380,6 +380,16 @@ class Plan:
         i = {}  # node -> incoming edges (set of nodes the node depends upon)
         # resulting list
         l = []
+        # Here we execute two "nanopasses" (a term borrowed from compiler implementation)
+        #
+        # Firstly, we traverse a virtual full dependency graph (consisting of actions and data nodes)
+        # and reduce it to dependency graph consiting of actions only (throwing away details about specific data nodes
+        # causing action dependency).
+        #
+        # Secondly, we perform a toposort over actions
+        #
+        # Q: Maybe reuse https://github.com/pombredanne/bitbucket.org-ericvsmith-toposort
+
         # 1. Transform execution plan into dependency graph
         for transform in self.transforms:
             # if none of sources is a target of some other transform, add this node it to s
@@ -395,6 +405,7 @@ class Plan:
                         i[depending_transform] = set()
                     o[transform].add(depending_transform)
                     i[depending_transform].add(transform)
+
         # 2. Now run Kahns algorithm (could be separated from previous to improve abstraction)
         while len(s) > 0:
             n = s.pop()

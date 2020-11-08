@@ -28,7 +28,7 @@ def mkplan(ns, plan_builder):
 def update(ns, plan_builder):
     p = mkplan(ns, plan_builder)
     client = docker.from_env()
-    state = State()
+    state = None
     p.update(client, state)
 
 def clean(ns, plan_builder):
