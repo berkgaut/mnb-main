@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+set -o errexit
+
+if [ ! -d ./mnb-main/venv ]
+then
+    mkdir ./mnb-main/venv
+    python3 -m venv ./mnb-main/venv || (rm -rf ./mnb-main/venv; exit 1)
+fi
+
+if [ -f ./mnb-main/venv/bin/activate ]
+then
+    source ./mnb-main/venv/bin/activate
+elif [ -f  ./mnb-main/venv/Scripts/activate ] # MSYS Windows
+then
+    source  ./mnb-main/venv/Scripts/activate
+elif [ -f ./mnb-main/venv/usr/local/bin/activate ] # macOS
+then
+    source ./mnb-main/venv/usr/local/bin/activate
+else
+    echo "Could not find virtualenv activation script"
+    exit 1
+fi
+
+python3 -m pip install -r ./mnb-main/requirements.txt
+
+env PYTHONPATH=./mnb-main \
+  python3 -m unittest discover mnb-main/tests "test_*.py"

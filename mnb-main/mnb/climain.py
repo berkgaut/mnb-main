@@ -30,6 +30,7 @@ def update(ns, plan_builder):
     client = docker.from_env()
     state = None
     p.update(client, state)
+    client.close()
 
 def clean(ns, plan_builder):
     p = mkplan(ns, plan_builder)

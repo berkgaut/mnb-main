@@ -309,13 +309,13 @@ class Plan:
         for wf in self.workfiles.values():
             print(wf)
         print("**** Transforms:\n")
-        for t in self.toposorted_transforms():
+        for t in self.runlist():
             print(t)
 
     def update(self, client, state):
         for image in self.images.values():
             image.prepare(client, state)
-        for transform in self.toposorted_transforms():
+        for transform in self.runlist():
             if transform.need_update(state):
                 transform.run(client, state)
 
@@ -369,7 +369,7 @@ class Plan:
             self.images[name] = img
             return img
 
-    def toposorted_transforms(self):
+    def runlist(self):
         """
         Return topologically sorted list of transforms
         """
