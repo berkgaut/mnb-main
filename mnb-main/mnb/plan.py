@@ -2,6 +2,7 @@ import io
 import shutil
 import threading
 from pathlib import Path, PurePosixPath
+from typing import List
 
 from docker.types import Mount
 
@@ -9,17 +10,57 @@ from mnb.log import *
 
 MNB_RUN_PATH = PurePosixPath("/mnb/run")
 
+class Context:
+    """
+    Context passed around during plan preparation and execution
+    """
+    def __init__(self, docker_client, state_storage):
+        self.docker_client = docker_client
+        self.state_storage = state_storage
 
-class RegistryImage(object):
-    def __init__(self, name):
-        self.name = name
+    def close(self):
+        self.docker_client.close()
+        self.state_storage.close()
+
+
+class Action(object):
+    def prepare(self, context):
+        raise NotImplementedError
+
+    def need_update(self, context):
+        raise NotImplementedError
+
+    def run(self, context):
+        raise NotImplementedError
+
+    def clean(self, context):
+        raise NotImplementedError
+
+    def inputs(self):
+        raise NotImplementedError
+
+    def outputs(self):
+        raise NotImplementedError
+
+
+class PullImage(Action):
+    def set_dependant_image(self, image):
+        self.image = image
+        self.name = image.name
 
     def __str__(self):
         return "registry_image(%s)" % self.name
 
-    def prepare(self, client, state):
-        if len(client.images.list(self.name)) == 0:
-            low_level_api = client.api
+    def inputs(self):
+        return set()
+
+    def outputs(self):
+        return {self.image}
+
+    def prepare(self, context):
+        # TODO: move here code from planx to check RepoDigests
+        if len(context.docker_client.images.list(self.name)) == 0:
+            low_level_api = context.docker_client.api
             e = self.name.split(":")
             repo = e[0]
             if len(e) == 1:
@@ -32,28 +73,61 @@ class RegistryImage(object):
         else:
             INFO(self.name + " already pulled")
 
+    def need_update(self, context):
+        return False
 
-class BuildImage(object):
-    def __init__(self, absrootpath, name, path):
+    def run(self, context):
+        pass
+
+    def clean(self, context):
+        # TODO: clean image
+        pass
+
+
+class BuildImage(Action):
+    def __init__(self, absrootpath, path, src_files = None):
+        if not src_files:
+            src_files = []
         self.absrootpath = absrootpath
-        self.name = name
         self.path = path
+        self.sources = set(src_files)
+
+    def inputs(self):
+        return {source.workfile for source in self.sources}
+
+    def outputs(self):
+        return {self.image}
+
+    def set_dependant_image(self, image):
+        self.image = image
+        self.name = image.name
 
     def __str__(self):
         return "build_image(%s, %s)" % (self.name, self.path)
 
-    def prepare(self, client, state):
-        if len(client.images.list(self.name)) > 0:
-            # TODO: implement smart rebuilt when dockerfile is modified
+    def prepare(self, context):
+        pass
+
+    def need_update(self, context):
+        if len(context.docker_client.images.list(self.name)) > 0:
+            # TODO: look at sources
             INFO(self.name + " already built")
-            return
+            return False
         else:
-            INFO("Building " + self.name)
-            (image, logs) = client.images.build(path=self.path,
-                                                tag=self.name,
-                                                rm=False)
-            for line in logs:
-                INFO(line)
+            return True
+
+    def run(self, context):
+        INFO("Building " + self.name)
+        # TODO: copy only sources to a new context
+        (image, logs) = context.docker_client.images.build(path=self.path,
+                                                           tag=self.name,
+                                                           rm=False)
+        for line in logs:
+            INFO(line)
+
+    def clean(self, context):
+        # TODO: clean image
+        pass
 
 
 class SrcFile(object):
@@ -68,20 +142,18 @@ class SrcFile(object):
         return "source(%s)" % self.workfile
 
     def workpath(self):
-        """Mounted path"""
+        """
+        Returns a string representing path inside container
+        Part of plan builder API
+        """
         return str(MNB_RUN_PATH / self.through_file)
 
     def workdir(self):
+        """
+        Returns a string representing path to containing directory inside container
+        Part of plan builder API
+        """
         return str(MNB_RUN_PATH)
-
-    def prepare_source(self, workdir_path):
-        # TODO: optimize the case without preprocessor through direct mount
-        result_path = workdir_path / self.through_file
-        with Path(self.workfile.internal_path).open('rb') as f:
-            b = f.read()
-            # TODO preprocess
-            with Path(result_path).open('wb') as g:
-                g.write(b)
 
 
 class DstFile(object):
@@ -94,37 +166,39 @@ class DstFile(object):
         return "target(%s)" % self.workfile
 
     def workpath(self):
+        """
+        Returns a string representing file inside container
+        Part of plan builder API
+        """
         return str(self._workpath())
 
     def _workpath(self):
         return PurePosixPath("/mnb/out") / self.through_file
 
     def workdir(self):
+        """
+        Returns a string representing file's containing directory inside container
+        Part of plan builder api
+        """
         return str(self._workpath().parent)
 
-    def update_content(self, b):
-        with Path(self.workfile.internal_path).open('wb') as f:
-            f.write(b.encode('utf-8'))
 
-    def update_file(self, outdir_path):
-        with Path(outdir_path / self.through_file).open("rb") as i:
-            b = i.read()
-            with Path(self.workfile.internal_path).open('wb') as f:
-                f.write(b)
-
-
-class Transform(object):
+class Transform(Action):
     def __init__(self, absrootpath, sources, targets, image, command, entrypoint):
-        self.absrootpath = absrootpath
-        self.sources = sources
-        self.targets = targets
+        self.absrootpath : Path = absrootpath
+        self.sources: List[SrcFile] = sources
+        self.targets: List[DstFile] = targets
         self.image = image
-        self.command = command
-        self.entrypoint = entrypoint
-        for source in sources:
-            source.workfile.add_outgoing_dependency(self)
-        for target in targets:
-            target.workfile.add_incoming_dependency(self)
+        self.command: List[str] = command
+        self.entrypoint:str = entrypoint
+
+    def inputs(self):
+        result = {source.workfile for source in self.sources}
+        result.add(self.image)
+        return result
+
+    def outputs(self):
+        return {target.workfile for target in self.targets}
 
     def __str__(self):
         r = str(self.image) + ": " + ", ".join([str(source) for source in self.sources]) + \
@@ -132,7 +206,11 @@ class Transform(object):
             ", ".join([str(target) for target in self.targets])
         return r
 
-    def need_update(self, state):
+    def prepare(self, context):
+        pass
+
+    def need_update(self, context):
+        # mtime comparison considered harmful https://apenwarr.ca/log/20181113
         import datetime
         if len(self.targets) == 0:
             return True  # not entirely sure about this
@@ -150,13 +228,13 @@ class Transform(object):
             min_target_mtime = min(min_target_mtime, target_path.stat().st_mtime)
         return max_source_mtime > min_target_mtime
 
-    def clean(self):
+    def clean(self, context):
         for target in self.targets:
             target_path = Path(target.workfile.internal_path)
             if target_path.exists():
                 target_path.unlink()
 
-    def run(self, client, state):
+    def run(self, context):
         ensure_writable_dir(Path(".mnb.d"))
         with Path(".mnb.d") / str(id(self)) as context_dir:
             context_path = Path(context_dir)
@@ -168,7 +246,14 @@ class Transform(object):
             env = {}
             for source in self.sources:
                 if source.through_file:
-                    source.prepare_source(workdir)
+                    # TODO: optimize the case without preprocessor through direct mount
+                    # copy source file into destination
+                    result_path = workdir / source.through_file
+                    with Path(source.workfile.internal_path).open('rb') as i:
+                        bytes = i.read()
+                        # TODO preprocess
+                        with Path(result_path).open('wb') as o:
+                            o.write(bytes)
                     m = Mount(source=str(self.absrootpath / source.workfile.internal_path),
                               target=str(source.workpath()),
                               type='bind',
@@ -186,7 +271,7 @@ class Transform(object):
                                 read_only=False))
             INFO("command: %s" % self.command)
             INFO("environment: %s" % env)
-            container = client.containers.create(
+            container = context.docker_client.containers.create(
                 self.image.name,
                 self.command,
                 entrypoint=self.entrypoint,
@@ -219,9 +304,13 @@ class Transform(object):
             receiver_thread.join()
             for target in self.targets:
                 if target.through_stdout:
-                    target.update_content(stdout_stream.getvalue().decode("utf-8"))
+                    with Path(target.workfile.internal_path).open('wb') as f:
+                        f.write(stdout_stream.getvalue())
                 elif target.through_file:
-                    target.update_file(outdir)
+                    with Path(outdir / target.through_file).open("rb") as i:
+                        bytes = i.read()
+                        with Path(target.workfile.internal_path).open('wb') as o:
+                            o.write(bytes)
                 # TODO: stderr out
             container.reload()
             #INFO("Status: %s" % container.attrs['State']['Status'])
@@ -271,35 +360,52 @@ def ensure_writable_dir(path):
     return path
 
 
-class WorkFile:
-    """A file that is part of execution plan"""
+class ValueBase:
+    def __init__(self):
+        self._producer = None
+        self._consumers = set()
+
+    def add_consumer(self, consumer):
+        self._consumers.add(consumer)
+
+    def set_producer(self, producer):
+        self._producer = producer
+
+    def producer(self):
+        return self._producer
+
+    def consumers(self):
+        return self._consumers
+
+
+class WorkFile(ValueBase):
+    """A file that is a part of execution plan"""
 
     def __init__(self, internal_path):
+        super().__init__()
         # the path of file as seen mounted inside container
         self.internal_path = internal_path
-
-        self.incoming_dependencies = set()
-        self.outgoing_dependencies = set()
 
     def __str__(self):
         # return "%s\nincoming: %s\noutgoing: %s" % (self.internal_path, self.incoming_dependencies, self.outgoing_dependencies)
         return str(self.internal_path)
 
-    def add_outgoing_dependency(self, d):
-        self.outgoing_dependencies.add(d)
 
-    def add_incoming_dependency(self, d):
-        self.incoming_dependencies.add(d)
+class Image(ValueBase):
+    """An image that is a part of execution plan"""
+    def __init__(self, name: str):
+        super().__init__()
+        self.name : str = name
 
 
 class Plan:
-    def __init__(self, absroot_path):
+    def __init__(self, absroot_path : str):
         # Path of root on the host machine
-        self.absroot_path = absroot_path
-
-        self.transforms = []
-        self.images = {}
-        self.workfiles = {}
+        self.absroot_path : str = absroot_path
+        self.transforms = set()
+        self.images_sources = set()
+        self.workfiles = dict()
+        self.images = dict()
 
     def show(self):
         print("**** Images:\n")
@@ -312,17 +418,19 @@ class Plan:
         for t in self.runlist():
             print(t)
 
-    def update(self, client, state):
-        for image in self.images.values():
-            image.prepare(client, state)
-        for transform in self.runlist():
-            if transform.need_update(state):
-                transform.run(client, state)
+    def update(self, context):
+        runlist = self.runlist()
+        for action in runlist:
+            action.prepare(context)
+        for action in runlist:
+            if action.need_update(context):
+                action.run(context)
 
-    def clean(self):
-        for transform in self.transforms:
-            transform.clean()
+    def clean(self, context):
+        for action in self.runlist():
+            action.clean(context)
 
+    ### Builder
     def src_file(self, src_path, through_file=None, through_stdin=None, through_env=None, preprocessor=None):
         wf = self.workfile_for_path(src_path)
         return SrcFile(wf, through_file, through_stdin, through_env, preprocessor)
@@ -346,28 +454,40 @@ class Plan:
 
     def transform(self, sources, targets, image, command, entrypoint=None):
         new_transform = Transform(self.absroot_path, sources, targets, image, command, entrypoint)
-        self.transforms.append(new_transform)
+        self.transforms.add(new_transform)
+        for source in sources:
+            source.workfile.add_consumer(new_transform)
+        for target in targets:
+            # TODO: check conflict
+            target.workfile.set_producer(new_transform)
+        image.add_consumer(new_transform)
         return new_transform
 
-    # IDEA: intoduce runnable actions (transforms or image prepararion steps), depending on workfiles
-    # In this case docker buidls would get integrated with file transformations => generated Dockerfiles
-    def build_image(self, name, path):
+    def build_image(self, name, path, src_files = None):
         if name in self.images:
-            # TODO: check conflict
-            return self.images[name]
+            raise Exception("Image build %s already declared; reuse the value" % name)
         else:
-            img = BuildImage(self.absroot_path, name, path)
-            self.images[name] = img
-            return img
+            image_source = BuildImage(self.absroot_path, path, src_files)
+            return self._new_image(name, image_source)
 
     def registry_image(self, name):
         if name in self.images:
-            # TODO: check conflict
+            if not isinstance(self.images[name].producer(), PullImage):
+                raise Exception("Conflict: image %s declared in different way" % name)
             return self.images[name]
         else:
-            img = RegistryImage(name)
-            self.images[name] = img
-            return img
+            image_source = PullImage()
+            return self._new_image(name, image_source)
+
+    def _new_image(self, name, source):
+        if name in self.images:
+            raise Exception("conflict: image %s already declared" % name)
+        image = Image(name)
+        self.images[name] = image
+        image.set_producer(source)
+        source.set_dependant_image(image)
+        self.images_sources.add(source)
+        return image
 
     def runlist(self):
         """
@@ -391,20 +511,21 @@ class Plan:
         # Q: Maybe reuse https://github.com/pombredanne/bitbucket.org-ericvsmith-toposort
 
         # 1. Transform execution plan into dependency graph
-        for transform in self.transforms:
-            # if none of sources is a target of some other transform, add this node it to s
-            if sum([len(source.workfile.incoming_dependencies) for source in transform.sources]) == 0:
-                s.add(transform)
+        all_actions = self.transforms.union(self.images_sources)
+        for action in all_actions:
+            # if none of inputs is produced by some other action, add this action it to set s (nodes without incoming edges)
+            if all(map(lambda input_value: input_value.producer() is None, action.inputs())):
+                s.add(action)
             # add outgoing edges to graph, if any
-            for target in transform.targets:
-                for depending_transform in target.workfile.outgoing_dependencies:
-                    # add an edge transform -> depending_transform to the graph
-                    if transform not in o:
-                        o[transform] = set()
-                    if depending_transform not in i:
-                        i[depending_transform] = set()
-                    o[transform].add(depending_transform)
-                    i[depending_transform].add(transform)
+            for output in action.outputs():
+                for depending_action in output.consumers():
+                    # add an edge action -> depending_action to the graph
+                    if action not in o:
+                        o[action] = set()
+                    if depending_action not in i:
+                        i[depending_action] = set()
+                    o[action].add(depending_action)
+                    i[depending_action].add(action)
 
         # 2. Now run Kahns algorithm (could be separated from previous to improve abstraction)
         while len(s) > 0:
@@ -432,6 +553,3 @@ class Plan:
         else:
             return l
 
-
-class State:
-    pass

@@ -14,9 +14,9 @@ class PlanBuilderTest(unittest.TestCase):
         dst_file_c = plan.dst_file("file_C", through_file="bar_output_file")
         image_bar = plan.registry_image("bar")
         tf_2 = plan.transform([src_file_b], [dst_file_c], image_bar, ["echo", "bar"])
-        tt = plan.runlist()
-        self.assertEqual(tt[0], tf_1)
-        self.assertEqual(tt[1], tf_2)
-
+        runlist = plan.runlist()
+        self.assertIn(image_foo, tf_1.inputs())
+        self.assertIn(image_bar, tf_2.inputs())
+        self.assertLess(runlist.index(tf_1), runlist.index(tf_2))
 
 

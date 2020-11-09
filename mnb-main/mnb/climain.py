@@ -6,9 +6,15 @@ from pathlib import PureWindowsPath
 import docker
 from mnb.plan import *
 from mnb.log import INFO, WARN, ERROR
+from mnb.state import State
 from mnb.version import MNB_VERSION
 
-def mkplan(ns, plan_builder):
+def mkplan(absroot_path, plan_builder):
+    plan = Plan(absroot_path=absroot_path)
+    return plan_builder(plan)
+
+
+def get_abs_root_path(ns):
     if not ns.rootabspath:
         rootabspath = os.getcwd()
         WARN("--rootabspath not specified, assuming " + rootabspath)
@@ -22,29 +28,44 @@ def mkplan(ns, plan_builder):
     if not absroot_path.is_absolute():
         ERROR("--contextpath should be an absolute path: %s" % absroot_path)
         exit(1)
-    plan = Plan(absroot_path=absroot_path)
-    return plan_builder(plan)
+    return absroot_path
+
 
 def update(ns, plan_builder):
-    p = mkplan(ns, plan_builder)
+    absroot_path = get_abs_root_path(ns)
+    p = mkplan(absroot_path, plan_builder)
     client = docker.from_env()
-    state = None
-    p.update(client, state)
-    client.close()
+    state_path = Path(absroot_path) / ".mnb-state.sqlite"
+    state = State(str(state_path))
+    context = Context(client, state)
+    try:
+        p.update(context)
+    finally:
+        context.close()
 
 def clean(ns, plan_builder):
-    p = mkplan(ns, plan_builder)
-    p.clean()
+    absroot_path = get_abs_root_path(ns)
+    p = mkplan(absroot_path, plan_builder)
+    client = docker.from_env()
+    state_path = Path(absroot_path) / ".mnb-state.sqlite"
+    state = State(str(state_path))
+    context = Context(client, state)
+    try:
+        p.clean(context)
+    finally:
+        context.close()
 
 def showplan(ns, plan_builder):
-    p = mkplan(ns, plan_builder)
+    absroot_path = get_abs_root_path(ns)
+    p = mkplan(absroot_path, plan_builder)
     p.show()
 
 def argparse_test(ns):
     print(ns)
 
 def run_extension(ns, plan_builder):
-    p = mkplan(ns, plan_builder)
+    absroot_path = get_abs_root_path(ns)
+    p = mkplan(absroot_path, plan_builder)
     print("run extension: %s", ns.extension_args)
 
 def scripts(ns):
