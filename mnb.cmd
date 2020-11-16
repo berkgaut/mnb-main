@@ -28,4 +28,4 @@ REM OTHER DEALINGS IN THE SOFTWARE.
 REM
 REM For more information, please refer to <http://unlicense.org/>
 
-docker run --env DOCKER_HOST=tcp://host.docker.internal:2375 -v %CD%:/mnb/run --rm bberkgaut/mnb:0.5.4 --windows-host --rootabspath %CD% %1 %2 %3 %4 %5 %6 %7 %8 %9
+docker run --env DOCKER_HOST=tcp://host.docker.internal:2375 -v %CD%:/mnb/run --rm bberkgaut/mnb:0.7.0 --windows-host --rootabspath %CD% %1 %2 %3 %4 %5 %6 %7 %8 %9
