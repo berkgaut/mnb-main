@@ -58,20 +58,25 @@ class PullImage(Action):
         return {self.image}
 
     def prepare(self, context):
-        # TODO: move here code from planx to check RepoDigests
         if len(context.docker_client.images.list(self.name)) == 0:
-            low_level_api = context.docker_client.api
-            e = self.name.split(":")
-            repo = e[0]
-            if len(e) == 1:
-                tag = "latest"
-            else:
-                tag = e[1]
-            INFO("Pulling " + self.name)
-            for line in low_level_api.pull(repo, tag=tag, stream=True, decode=True):
-                INFO(line)
+            self.pull_image(context.docker_client)
         else:
-            INFO(self.name + " already pulled")
+            local_repodigest=self.get_local_repodigest(context)
+            registry_repodigest=self.get_registry_repodigest(context)
+            if registry_repodigest != local_repodigest:
+                self.pull_image(context.docker_client)
+
+    def pull_image(self, docker_client):
+        low_level_api = docker_client.api
+        e = self.name.split(":")
+        repo = e[0]
+        if len(e) == 1:
+            tag = "latest"
+        else:
+            tag = e[1]
+        INFO("Pulling " + self.name)
+        for line in low_level_api.pull(repo, tag=tag, stream=True, decode=True):
+            INFO(line)
 
     def need_update(self, context):
         return False
@@ -82,6 +87,27 @@ class PullImage(Action):
     def clean(self, context):
         # TODO: clean image
         pass
+
+    def get_local_repodigest(self, context):
+        """
+        Return RepoDigest of image on Docker server
+        """
+        images_list = context.docker_client.images.list(self.name)
+        if len(images_list) == 0:
+            return None
+        sorted_by_created = sorted(images_list, key=lambda x: x.attrs.get('Created'), reverse=True)
+        image = sorted_by_created[0]
+        repo_digests = image.attrs.get('RepoDigests')
+        if len(repo_digests) != 1:
+            raise Exception("Ambigous RepoDigests, do not know how to handle this: %s" % str(repo_digests))
+        repo_digest = repo_digests[0]
+        return repo_digest.split("@")[-1]
+
+    def get_registry_repodigest(self, context):
+        registry_data = context.docker_client.images.get_registry_data(self.name)
+        repo_digest = registry_data.attrs['Descriptor']['digest']
+        return repo_digest
+
 
 
 class BuildImage(Action):
