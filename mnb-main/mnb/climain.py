@@ -1,18 +1,21 @@
 import os
 import argparse
 from inspect import signature
-from pathlib import PureWindowsPath
+from pathlib import PureWindowsPath, PurePosixPath, Path
+from typing import Callable, Any
 
 import docker
-from mnb.plan import *
+
+from mnb.builder import Plan
+from mnb.executor import Context, PlanExecutor, sys
 from mnb.log import INFO, WARN, ERROR
 from mnb.state import State
 from mnb.version import MNB_VERSION
 
-def mkplan(absroot_path, plan_builder):
-    plan = Plan(absroot_path=absroot_path)
-    return plan_builder(plan)
-
+def apply_plan(absroot_path, planf: Callable[[Plan], Any]) -> Plan:
+    builder = Plan()
+    planf(builder)
+    return builder
 
 def get_abs_root_path(ns):
     if not ns.rootabspath:
@@ -31,42 +34,33 @@ def get_abs_root_path(ns):
     return absroot_path
 
 
-def update(ns, plan_builder):
+def update(ns, planf):
     absroot_path = get_abs_root_path(ns)
-    p = mkplan(absroot_path, plan_builder)
+    p = apply_plan(absroot_path, planf)
     client = docker.from_env()
     state_path = Path(absroot_path) / ".mnb-state.sqlite"
     state = State(str(state_path))
-    context = Context(client, state)
+    context = Context(client, state, absroot_path)
     try:
-        p.update(context)
+        executor = PlanExecutor(p)
+        executor.update(context)
     finally:
         context.close()
 
 def clean(ns, plan_builder):
-    absroot_path = get_abs_root_path(ns)
-    p = mkplan(absroot_path, plan_builder)
-    client = docker.from_env()
-    state_path = Path(absroot_path) / ".mnb-state.sqlite"
-    state = State(str(state_path))
-    context = Context(client, state)
-    try:
-        p.clean(context)
-    finally:
-        context.close()
+    # TODO
+    pass
 
 def showplan(ns, plan_builder):
-    absroot_path = get_abs_root_path(ns)
-    p = mkplan(absroot_path, plan_builder)
-    p.show()
+    # TODO
+    pass
 
 def argparse_test(ns):
     print(ns)
 
 def run_extension(ns, plan_builder):
-    absroot_path = get_abs_root_path(ns)
-    p = mkplan(absroot_path, plan_builder)
-    print("run extension: %s", ns.extension_args)
+    # TODO
+    pass
 
 def scripts(ns):
     if ns.dev_mode:

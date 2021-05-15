@@ -1,22 +1,24 @@
-from mnb.plan import Plan
+from mnb.builder import Plan
 import unittest
 
 
 class PlanBuilderTest(unittest.TestCase):
 
     def test_simple_plan(self):
-        plan = Plan(absroot_path="/rootabspath")
-        image_foo = plan.registry_image("foo")
-        src_file_a = plan.src_file("source_A", through_file="foo_input_file", through_stdin=False, through_env=False, preprocessor=None)
-        dst_file_b = plan.dst_file("file_B", through_file="foo_output_file")
-        tf_1 = plan.transform([src_file_a], [dst_file_b], image_foo, ["echo", "foo"])
-        src_file_b = plan.src_file("file_B", through_file="bar_input_file")
-        dst_file_c = plan.dst_file("file_C", through_file="bar_output_file")
-        image_bar = plan.registry_image("bar")
-        tf_2 = plan.transform([src_file_b], [dst_file_c], image_bar, ["echo", "bar"])
-        runlist = plan.runlist()
-        self.assertIn(image_foo, tf_1.inputs())
-        self.assertIn(image_bar, tf_2.inputs())
-        self.assertLess(runlist.index(tf_1), runlist.index(tf_2))
+        plan = Plan()
+        image_foo = plan.image("foo").from_registry()
+        src_file_a = plan.file("source_A") #, through_file="foo_input_file", through_stdin=False, through_env=False, preprocessor=None)
+        dst_file_b = plan.file("file_B") #, through_file="foo_output_file")
+        plan.exec(image_foo, ["echo", "foo"],
+                         inputs=[src_file_a.as_input()],
+                         outputs=[dst_file_b.as_output()])
+        src_file_b = plan.file("file_B") #, through_file="bar_input_file")
+        dst_file_c = plan.file("file_C") #, through_file="bar_output_file")
+        image_bar = plan.image("bar").from_context("containers/bar")
+        aws_creds = plan.file(".aws/credentials", secret=True).as_input()
+        aws_config = plan.file(".aws/config", secret=True).as_input()
+        plan.exec(image_bar, ["bar", src_file_b.as_input(through_path="src")],
+                         outputs=[dst_file_c.as_output()], entrypoint="entrypoint").input(aws_creds).input(aws_config)
+
 
 
