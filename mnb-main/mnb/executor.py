@@ -242,19 +242,26 @@ class ExecAction(Action):
             env = {}
             for source in self._plan_fragment.inputs:
                 if isinstance(source, InputFile):
-                    # TODO: optimize the case without preprocessor through direct mount
-                    # copy source file into destination
-                    result_path = workdir / source.through_path
-                    with Path(source.workfile.posix_path).open('rb') as i:
-                        bytes = i.read()
-                        # TODO preprocess
-                        with Path(result_path).open('wb') as o:
-                            o.write(bytes)
-                    m = Mount(source=str(context.abs_rootpath / source.workfile.posix_path),
-                              target=str(source.through_path),
-                              type='bind',
-                              read_only=True)
-                    mounts.append(m)
+                    preprocess = False # TODO: add preprocessor spec
+                    if (preprocess):
+                        # copy source file into destination
+                        result_path = workdir / source.through_path
+                        with Path(source.workfile.posix_path).open('rb') as i:
+                            bytes = i.read()
+                            # TODO preprocess
+                            with Path(result_path).open('wb') as o:
+                                o.write(bytes)
+                        m = Mount(source=str(context.abs_rootpath / result_path),
+                                  target=str(PurePosixPath("/mnb/run") / source.through_path),
+                                  type='bind',
+                                  read_only=True)
+                        mounts.append(m)
+                    else:
+                        m = Mount(source=str(context.abs_rootpath / source.workfile.posix_path),
+                                  target=str(PurePosixPath("/mnb/run") / source.through_path),
+                                  type='bind',
+                                  read_only=True)
+                        mounts.append(m)
                 elif isinstance(source, Stdin):
                     stdin_sources.append(source)
                 elif isinstance(source, InputFileThroughEnv):
@@ -267,12 +274,14 @@ class ExecAction(Action):
                                 read_only=False))
             INFO("command: %s" % self._plan_fragment.command)
             INFO("environment: %s" % env)
+            INFO("mounts: %s" % mounts)
             container = context.docker_client.containers.create(
                 self._plan_fragment.image.name,
                 self._plan_fragment.command,
                 entrypoint=self._plan_fragment.entrypoint,
                 environment=env,
                 mounts=mounts,
+                working_dir="/mnb/run",
                 detach=True,
                 stdin_open=True)
             docker_socket = container.attach_socket(params=dict(interactive=True,
@@ -429,15 +438,15 @@ class PlanExecutor:
                 a[image] = build_image_action
                 # if context dir contains any WorkFiles, add corresponding FileValues as dependencies
                 for dir in directories.keys():
-                    if dir.is_relative_to(image.build_from_context):
+                    if dir.is_relative_to(image_value._plan_element.build_from_context):
                         for file_value in directories[dir]:
                             build_image_action.add_input(file_value)
 
         for exec in self.plan.execs():
-            image = v[exec.image]
-            if not isinstance(image, ImageValue):
-                raise Exception("not an ImageValue %s" % image)
-            exec_action = ExecAction(exec, image)
+            image_value = v[exec.image]
+            if not isinstance(image_value, ImageValue):
+                raise Exception("not an ImageValue %s" % image_value)
+            exec_action = ExecAction(exec, image_value)
             a[exec] = exec_action
             for input in exec.inputs:
                 exec_action.add_input(v[input.workfile])

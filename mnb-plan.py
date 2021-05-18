@@ -1,7 +1,4 @@
-import os
 from mnb import *
-from mnb.builder import Plan
-
 
 def build_plan(p: Plan):
     print("build_plan")
@@ -26,18 +23,22 @@ def build_plan(p: Plan):
     #             ["bash", "-c", 'read X; sleep 1; >&2 echo "X=${X}"; echo Hello stdout ${SAMPLE_DAT}'])
     # return p
     p.require_api(1,0)
-    p.image("bberkgaut/mnb:%s" % MNB_VERSION).from_context(".")
+    p.build_image("bberkgaut/mnb:%s" % MNB_VERSION, context_path=".")
 
     plantuml_dir = Path("containers/plantuml")
     plantuml_version = (plantuml_dir / "version").read_text().strip()
-    plantuml_image = p.image("bberkgaut/mnb-plantuml:%s" % plantuml_version).from_context(plantuml_dir)
+    plantuml_image = p.build_image("bberkgaut/mnb-plantuml:%s" % plantuml_version, context_path=plantuml_dir)
 
     sample_txt = p.file("sample.txt")
-    bash_image = p.image('bash').from_registry()
+    bash_image = p.pull_image('bash')
     p.exec(bash_image,
            ["bash", "-c", "echo '-*- Hallo -*-'"],
            outputs=[sample_txt.through_stdout()])
     p.exec(bash_image,
            ["bash", "-c", 'read X; sleep 1; >&2 echo "X=${X}"; echo Hello stdout ${SAMPLE_DAT}'],
-           inputs=[sample_txt.through_stdin(), sample_txt.through_env("SAMPLE_DAT")],
-           outputs=[p.file("stdout").through_stdout(), p.file("stderr").through_stderr()])
+           inputs=[sample_txt.through_stdin(),
+                   sample_txt.through_env("SAMPLE_DAT")],
+           outputs=[p.file("stdout").through_stdout(),
+                    p.file("stderr").through_stderr()])
+    #md2html(p, "README.md")
+    md2pdf(p, "README.md")

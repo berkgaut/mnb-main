@@ -6,7 +6,7 @@ class PlanBuilderException(Exception):
     pass
 
 
-InputT = Union['InputFile', 'Stdin']
+InputT = Union['InputFile', 'Stdin', 'InputFileThroughEnv']
 OutputT = Union['OutputFile', 'OutputStream']
 
 
@@ -25,10 +25,28 @@ class Plan:
         return self
 
     def image(self, name: str) -> 'Image':
+        return self._images[name]
+
+    def pull_image(self, name):
+        """
+        Declare image <name> as pulled from a registry
+        """
+        return self._add_image(name, Image(name, pull_from_registry=True))
+
+    def build_image(self, name, context_path: [str, PurePosixPath]):
+        """
+        Declare image <name> as built from a context <context_path>
+        """
+        return self._add_image(name, Image(name, build_from_context=PurePosixPath(context_path)))
+
+    def _add_image(self, name, new_image):
         if name in self._images:
-            return self._images[name]
+            original_image = self._images[name]
+            if original_image != new_image:
+                raise PlanBuilderException("Image redefinition conflict, original=%s, new=%s" % (original_image, new_image))
+            else:
+                return original_image
         else:
-            new_image = Image(name)
             self._images[name] = new_image
             return new_image
 
@@ -43,7 +61,7 @@ class Plan:
             return new_workfile
 
     def exec(self,
-             image: Union['Image'],
+             image: 'Image',
              command: list[Union[str, 'CommandElement']],
              inputs: Optional[list[InputT]] = None,
              outputs: Optional[list[OutputT]] = None,
@@ -87,7 +105,7 @@ class Exec:
                 if cmdel.is_input():
                     self.inputs.append(cmdel)
                 if cmdel.is_output():
-                    self.inputs.append(cmdel)
+                    self.outputs.append(cmdel)
 
     def input(self, input: InputT) -> 'Exec':
         self.inputs.append(input)
@@ -190,9 +208,10 @@ class OutputFile(CommandElement):
 
     def as_command_element(self) -> str:
         if self.through_path:
-            return str(self.through_path)
+            # TODO FIXME HACKETY HACK: this one should not be aware of /mnb/out dir; should I remove the notion of separate /mnb/out?
+            return str(PurePosixPath("../out") / self.through_path)
         else:
-            return str(self.workfile.path())
+            return str(PurePosixPath("../out") / self.workfile.path())
 
     def is_input(self) -> bool:
         return False
@@ -228,23 +247,22 @@ class Image:
     build_from_context: Optional[PurePosixPath] = None
     pull_from_registry: bool = False
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, pull_from_registry: bool = False, build_from_context: Optional[PurePosixPath] = None):
+        if pull_from_registry and build_from_context:
+            raise PlanBuilderException("Ambiguous definition (image could be either pulled from registry or built, but not both), image name=%s" % name)
+        if not pull_from_registry and (build_from_context is None):
+            raise PlanBuilderException("Incomplete definition (image should be either pulled from registry or built), image name=%s" % name)
         self.name = name
+        self.pull_from_registry = pull_from_registry
+        self.build_from_context = build_from_context
 
-    def from_context(self, path: Union[str, PurePosixPath]):
-        self._ensure_not_initialized()
-        self.build_from_context = PurePosixPath(path)
-        return self
+    # Hash & equality defined to allow Plan check for conflicting image declarations
+    def __eq__(self, o: object) -> bool:
+        if not isinstance(o, Image):
+            return False
+        else:
+            return self.name == o.name and self.build_from_context == o.build_from_context and self.pull_from_registry == o.pull_from_registry
 
-    def from_registry(self):
-        self._ensure_not_initialized()
-        self.pull_from_registry = True
-        return self
+    def __hash__(self) -> int:
+        return hash((self.name, self.build_from_context, self.pull_from_registry))
 
-    def _ensure_not_initialized(self):
-        if self.build_from_context or self.pull_from_registry:
-            if self.build_from_context:
-                msg = "build from %s" % self.build_from_context
-            else:
-                msg = "pull from registry"
-            raise PlanBuilderException("image %s already specified as %s", (self.name, msg))

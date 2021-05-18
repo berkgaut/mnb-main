@@ -1,49 +1,50 @@
 from pathlib import Path, PurePosixPath
 
-def pandoc_image(p):
-    return p.registry_image("dalibo/pandocker")
+from mnb.builder import Plan
 
-def plantuml_image(p):
-    return p.registry_image("bberkgaut/mnb-plantuml:0.0.1")
+def pandoc_image(p: Plan):
+    return p.pull_image("dalibo/pandocker")
 
-def jq_image(p):
-    return p.registry_image("imega/jq")
+def plantuml_image(p: Plan):
+    return p.pull_image("bberkgaut/mnb-plantuml")
 
-def mysql_client_image(p):
-    return p.registry_image("imega/mysql-client")
+def jq_image(p: Plan):
+    return p.pull_image("imega/jq")
 
-def src_dst(p, source, dstsuffix):
+def mysql_client_image(p: Plan):
+    return p.pull_image("imega/mysql-client")
+
+def src_dst(p: Plan, source: [str, PurePosixPath], dstsuffix: str):
     src_path = PurePosixPath(source)
-    src_file = p.src_file(source, through_file=src_path.name)
+    src_file = p.file(src_path).as_input(src_path.name)
     dst_path = src_path.with_suffix(dstsuffix)
-    dst_file = p.dst_file(str(dst_path), through_file=dst_path.name)
+    dst_file = p.file(dst_path).as_output(dst_path.name)
     return (src_file, dst_file)
 
-def md2html(p, source, extra=[]):
+def md2html(p: Plan, source: [str, PurePosixPath], extra=None):
+    if extra is None:
+        extra = []
     src_file, dst_file = src_dst(p, source, ".html")
-    extras_deps = [p.src_file(f, through_file=Path(f).name) for f in extra]
-    p.transform(sources=extras_deps + [src_file],
-                targets=[dst_file],
-                image=pandoc_image(p),
-                command=["-f", "markdown",
-                         "-t", "html5",
-                         "--standalone",
-                         "-o", dst_file.workpath(),
-                         src_file.workpath()])
+    extras_deps = [p.file(f).as_input(PurePosixPath(f).name) for f in extra]
+    return p.exec(image=pandoc_image(p),
+           command=["-f", "markdown",
+                    "-t", "html5",
+                    "--standalone",
+                    "-o", dst_file,
+                    src_file],
+           inputs=extras_deps)
 
-def md2pdf(p, source):
+def md2pdf(p: Plan, source):
     src_file, dst_file = src_dst(p, source, ".pdf")
-    p.transform(sources=[src_file],
-                targets=[dst_file],
-                image=pandoc_image(p),
-                command=["-f", "markdown",
-                          "-t", "latex",
-                          "--pdf-engine=xelatex",
-                          "-V", "mainfont=Liberation Sans",
-                          "-V", "monofont=Liberation Mono",
-                          "--standalone",
-                          "-o", dst_file.workpath(),
-                          src_file.workpath()])
+    p.exec(image=pandoc_image(p),
+           command=["-f", "markdown",
+                    "-t", "latex",
+                    "--pdf-engine=xelatex",
+                    "-V", "mainfont=Liberation Sans",
+                    "-V", "monofont=Liberation Mono",
+                    "--standalone",
+                    "-o", dst_file,
+                    src_file])
 
 def plantuml2png(p, source):
     src_file, dst_file = src_dst(p, source, ".png")
