@@ -208,10 +208,9 @@ class OutputFile(CommandElement):
 
     def as_command_element(self) -> str:
         if self.through_path:
-            # TODO FIXME HACKETY HACK: this one should not be aware of /mnb/out dir; should I remove the notion of separate /mnb/out?
-            return str(PurePosixPath("../out") / self.through_path)
+            return str(self.through_path)
         else:
-            return str(PurePosixPath("../out") / self.workfile.path())
+            return str(self.workfile.path())
 
     def is_input(self) -> bool:
         return False

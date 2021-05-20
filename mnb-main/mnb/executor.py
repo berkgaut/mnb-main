@@ -2,7 +2,7 @@ import io
 import shutil
 import threading
 from pathlib import PurePosixPath, Path
-from typing import Any, Set, Iterable, Dict
+from typing import Any, Set, Iterable, List
 
 from mnb.builder import Image, Plan, WorkFile, Exec, InputFile, Stdin, InputFileThroughEnv, OutputStream, OutputFile
 from mnb.log import *
@@ -107,7 +107,7 @@ class RegistryImageValue(ImageValue):
         image = sorted_by_created[0]
         repo_digests = image.attrs.get('RepoDigests')
         if len(repo_digests) != 1:
-            raise Exception("Ambigous RepoDigests, do not know how to handle this: %s" % str(repo_digests))
+            raise Exception("Ambiguous RepoDigests, do not know how to handle this: %s" % str(repo_digests))
         repo_digest = repo_digests[0]
         return repo_digest.split("@")[-1]
 
@@ -236,22 +236,21 @@ class ExecAction(Action):
         with Path(".mnb.d") / str(id(self)) as context_path:
             ensure_writable_dir(context_path)
             workdir = ensure_writable_dir(context_path / "run")
-            outdir = ensure_writable_dir(context_path / "out")
             mounts = []
             stdin_sources = []
             env = {}
             for source in self._plan_fragment.inputs:
                 if isinstance(source, InputFile):
-                    preprocess = False # TODO: add preprocessor spec
-                    if (preprocess):
+                    preprocess = False  # TODO: add preprocessor spec
+                    if preprocess:
                         # copy source file into destination
-                        result_path = workdir / source.through_path
+                        preprocessed_path = workdir / source.through_path
                         with Path(source.workfile.posix_path).open('rb') as i:
-                            bytes = i.read()
+                            date = i.read()
                             # TODO preprocess
-                            with Path(result_path).open('wb') as o:
-                                o.write(bytes)
-                        m = Mount(source=str(context.abs_rootpath / result_path),
+                            with Path(preprocessed_path).open('wb') as o:
+                                o.write(date)
+                        m = Mount(source=str(context.abs_rootpath / preprocessed_path),
                                   target=str(PurePosixPath("/mnb/run") / source.through_path),
                                   type='bind',
                                   read_only=True)
@@ -268,8 +267,8 @@ class ExecAction(Action):
                     with Path(source.workfile.posix_path).open("rb") as f:
                         v = f.read()
                         env[source.name] = v
-            mounts.append(Mount(source=str(context.abs_rootpath / outdir),
-                                target="/mnb/out/",
+            mounts.append(Mount(source=str(context.abs_rootpath / workdir),
+                                target="/mnb/run",
                                 type="bind",
                                 read_only=False))
             INFO("command: %s" % self._plan_fragment.command)
@@ -316,11 +315,11 @@ class ExecAction(Action):
                         elif target.through_stderr:
                             f.write(stderr_stream.getvalue())
                 if isinstance(target, OutputFile):
-                    with Path(outdir / target.through_path).open("rb") as i:
-                        bytes = i.read()
+                    with Path(workdir / target.through_path).open("rb") as i:
+                        data = i.read()
                         with Path(target.workfile.posix_path).open('wb') as o:
-                            o.write(bytes)
-            container.reload() # update container status
+                            o.write(data)
+            container.reload()  # update container status
             INFO("Status: %s" % container.attrs['State']['Status'])
             exit_code = container.attrs['State']['ExitCode']
             if exit_code == 0:
@@ -341,8 +340,8 @@ class ExecAction(Action):
     def outputs(self) -> set['ValueBase']:
         return self._outputs
 
-    def add_input(self, input: ValueBase):
-        self._inputs.add(input)
+    def add_input(self, inp: ValueBase):
+        self._inputs.add(inp)
 
     def add_output(self, output: ValueBase):
         self._outputs.add(output)
@@ -392,7 +391,7 @@ class PlanExecutor:
     plan: Plan
     actions: Set[Action] = set()
     values: Set[ValueBase] = set()
-    #build_contexts: dict[PurePosixPath, set[BuildImageAction]] = dict()
+    # build_contexts: dict[PurePosixPath, set[BuildImageAction]] = dict()
 
     def __init__(self, plan):
         self.plan = plan
@@ -418,10 +417,10 @@ class PlanExecutor:
         for workfile in self.plan.files():
             value = FileValue(workfile)
             v[workfile] = value
-            dir = workfile.posix_path.parent
-            if dir not in directories:
-                directories[dir] = set()
-            directories[dir].add(value)
+            directory = workfile.posix_path.parent
+            if directory not in directories:
+                directories[directory] = set()
+            directories[directory].add(value)
 
         for image in self.plan.images():
             if image.pull_from_registry:
@@ -437,20 +436,20 @@ class PlanExecutor:
                 v[image] = image_value
                 a[image] = build_image_action
                 # if context dir contains any WorkFiles, add corresponding FileValues as dependencies
-                for dir in directories.keys():
-                    if dir.is_relative_to(image_value._plan_element.build_from_context):
-                        for file_value in directories[dir]:
+                for directory in directories.keys():
+                    if directory.is_relative_to(image_value._plan_element.build_from_context):
+                        for file_value in directories[directory]:
                             build_image_action.add_input(file_value)
 
-        for exec in self.plan.execs():
-            image_value = v[exec.image]
+        for e in self.plan.execs():
+            image_value = v[e.image]
             if not isinstance(image_value, ImageValue):
                 raise Exception("not an ImageValue %s" % image_value)
-            exec_action = ExecAction(exec, image_value)
-            a[exec] = exec_action
-            for input in exec.inputs:
-                exec_action.add_input(v[input.workfile])
-            for output in exec.outputs:
+            exec_action = ExecAction(e, image_value)
+            a[e] = exec_action
+            for inp in e.inputs:
+                exec_action.add_input(v[inp.workfile])
+            for output in e.outputs:
                 exec_action.add_output(v[output.workfile])
 
         self.actions = set(a.values())
@@ -478,7 +477,6 @@ class PlanExecutor:
         #
         # Q: Maybe reuse https://github.com/pombredanne/bitbucket.org-ericvsmith-toposort
 
-
         # 1. Dependency graph representation optimized for toposort
         o: dict[Action, set[Action]] = {}  # for actions: action -> set of outgoing dependency edges
         i: dict[Action, set[Action]] = {}  # for actions: action -> set of incoming dependency edges
@@ -489,7 +487,7 @@ class PlanExecutor:
         # 1. Transform execution plan into dependency graph
         for action in self.actions:
             # if action does not depend on any other action, add it to set s
-            if all(input.producer() is None for input in action.inputs()):
+            if all(inp.producer() is None for inp in action.inputs()):
                 s.add(action)
             # add outgoing edges to graph, if any
             for output in action.outputs():
@@ -504,7 +502,7 @@ class PlanExecutor:
 
         # 2. Now run Kahn's algorithm (could be separated from previous to improve abstraction)
         # resulting list
-        l = []
+        l: list[Action] = []
 
         while len(s) > 0:
             n = s.pop()
@@ -530,13 +528,3 @@ class PlanExecutor:
             raise Exception("Dependency graph has at least one cycle")
         else:
             return l
-
-
-
-
-
-
-
-
-
-
