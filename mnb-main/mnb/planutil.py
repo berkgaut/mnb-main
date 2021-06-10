@@ -14,17 +14,22 @@ def jq_image(p: Plan):
 def mysql_client_image(p: Plan):
     return p.pull_image("imega/mysql-client")
 
-def src_dst(p: Plan, source: [str, PurePosixPath], dstsuffix: str):
+def src_dst(p: Plan, source: [str, PurePosixPath], dstsuffix: str, dstsubdir = None):
     src_path = PurePosixPath(source)
     src_file = p.file(src_path).as_input(src_path.name)
-    dst_path = src_path.with_suffix(dstsuffix)
+    dst_name = PurePosixPath(src_path.name).with_suffix(dstsuffix)
+    if dstsubdir is None:
+        dst_parent = src_path.parent
+    else:
+        dst_parent = src_path.parent / dstsubdir
+    dst_path = dst_parent / dst_name
     dst_file = p.file(dst_path).as_output(dst_path.name)
     return (src_file, dst_file)
 
-def md2html(p: Plan, source: [str, PurePosixPath], extra=None):
+def md2html(p: Plan, source: [str, PurePosixPath], extra=None, dstsubdir=None):
     if extra is None:
         extra = []
-    src_file, dst_file = src_dst(p, source, ".html")
+    src_file, dst_file = src_dst(p, source, ".html", dstsubdir=dstsubdir)
     extras_deps = [p.file(f).as_input(PurePosixPath(f).name) for f in extra]
     return p.exec(image=pandoc_image(p),
            command=["-f", "markdown",
@@ -34,8 +39,8 @@ def md2html(p: Plan, source: [str, PurePosixPath], extra=None):
                     src_file],
            inputs=extras_deps)
 
-def md2pdf(p: Plan, source):
-    src_file, dst_file = src_dst(p, source, ".pdf")
+def md2pdf(p: Plan, source, dstsubdir=None):
+    src_file, dst_file = src_dst(p, source, ".pdf", dstsubdir=dstsubdir)
     p.exec(image=pandoc_image(p),
            command=["-f", "markdown",
                     "-t", "latex",
@@ -46,15 +51,15 @@ def md2pdf(p: Plan, source):
                     "-o", dst_file,
                     src_file])
 
-def plantuml2png(p, source):
-    src_file, dst_file = src_dst(p, source, ".png")
+def plantuml2png(p, source, dstsubdir=None):
+    src_file, dst_file = src_dst(p, source, ".png", dstsubdir=dstsubdir)
     p.transform(sources=[src_file],
                 targets=[dst_file],
                 image=plantuml_image(p),
                 command=["-v", "-o", dst_file.workdir(), "-tpng",  src_file.workpath()])
 
-def plantuml2pdf(p, source):
-    src_file, dst_file = src_dst(p, source, ".pdf")
+def plantuml2pdf(p, source, dstsubdir=None):
+    src_file, dst_file = src_dst(p, source, ".pdf", dstsubdir=dstsubdir)
     p.transform(sources=[src_file],
                 targets=[dst_file],
                 image=plantuml_image(p),
@@ -73,4 +78,3 @@ def walk_files(p, dir, ignore_dirs, visitor, context = None):
                 visitor(p, context, path)
     walk_files_1(Path(dir))
 
-    

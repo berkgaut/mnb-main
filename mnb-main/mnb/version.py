@@ -1,1 +1,1 @@
-MNB_VERSION = "1.0.0"
+MNB_VERSION = "1.0.1"

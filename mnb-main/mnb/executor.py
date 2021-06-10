@@ -290,10 +290,11 @@ class ExecAction(Action):
                         # copy source file into destination
                         preprocessed_path = workdir / source.through_path
                         with Path(source.workfile.posix_path).open('rb') as i:
-                            date = i.read()
+                            data = i.read()
                             # TODO preprocess
+                            ensure_writable_dir(preprocessed_path.parent)
                             with Path(preprocessed_path).open('wb') as o:
-                                o.write(date)
+                                o.write(data)
                         m = Mount(source=str(context.abs_rootpath / preprocessed_path),
                                   target=str(PurePosixPath("/mnb/run") / source.through_path),
                                   type='bind',
@@ -353,6 +354,7 @@ class ExecAction(Action):
             receiver_thread.join()
             for target in self._plan_fragment.outputs:
                 if isinstance(target, OutputStream):
+                    ensure_writable_dir(target.workfile.posix_path.parent)
                     with Path(target.workfile.posix_path).open('wb') as f:
                         if target.through_stdout:
                             f.write(stdout_stream.getvalue())
@@ -361,6 +363,7 @@ class ExecAction(Action):
                 if isinstance(target, OutputFile):
                     with Path(workdir / target.through_path).open("rb") as i:
                         data = i.read()
+                        ensure_writable_dir(target.workfile.posix_path.parent)
                         with Path(target.workfile.posix_path).open('wb') as o:
                             o.write(data)
             container.reload()  # update container status
@@ -418,7 +421,8 @@ def sender(sock, stdin_stream):
         buffer = buffer[sent:]
 
 
-def ensure_writable_dir(path):
+def ensure_writable_dir(param):
+    path = Path(param)
     if path.exists() and not path.is_dir():
         raise Exception("Not a directory: %s" % path)
     path.mkdir(exist_ok=True)
