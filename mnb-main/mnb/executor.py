@@ -1,8 +1,10 @@
 import io
+import json
 import shutil
 import threading
+from collections import OrderedDict
 from pathlib import PurePosixPath, Path
-from typing import Any, Set, Iterable, List
+from typing import Any, Set, Iterable
 
 from mnb.builder import Image, Plan, WorkFile, Exec, InputFile, Stdin, InputFileThroughEnv, OutputStream, OutputFile
 from mnb.log import *
@@ -70,15 +72,29 @@ class ValueBase(object):
 
     def prepare(self, context):
         """
-        Check if the value needs update
+        This method is called before execution of any action.
+        Values could fetch external data necessary for modification check
         """
         raise NotImplementedError
 
     def needs_update(self, context) -> bool:
+        """
+        Return whether value is missing or modified since the last plan execution
+        """
         raise NotImplementedError
+
+    def update_state(self, context):
+        """
+        This method is called after execution of all actions.
+        Values could update state storage
+        """
+        pass
 
 
 class ImageValue(ValueBase):
+    """
+    Base class for values representing images
+    """
     _plan_element: Image
 
     def __init__(self, plan_element: Image):
@@ -87,6 +103,9 @@ class ImageValue(ValueBase):
 
     def _name(self) -> str:
         return self._plan_element.name
+
+    def update_state(self, context):
+        pass
 
 
 class RegistryImageValue(ImageValue):
@@ -139,8 +158,33 @@ class FileValue(ValueBase):
         pass
 
     def needs_update(self, context) -> bool:
-        # TODO use state
-        return True
+        actual_state = self._state_value()
+        last_known_state = context.state_storage.get(self._state_key())
+        return actual_state is None or actual_state != last_known_state
+
+    def update_state(self, context):
+        context.state_storage[self._state_key()] = self._state_value()
+
+    def _state_key(self):
+        return json.dumps(dict(path=str(self._plan_element.path())))
+
+    def _state_value(self):
+        path = Path(self._plan_element.path())
+        if not path.exists():
+            return None
+        else:
+            # See https://apenwarr.ca/log/20181113
+            stat = path.stat()
+            s = OrderedDict(
+                     size = stat.st_size,
+                     mtime = stat.st_mtime,
+                     mtime_ns = stat.st_mtime_ns,
+                     inode_number = stat.st_ino,
+                     mode = stat.st_mode,
+                     owneruid = stat.st_uid,
+                     ownergid = stat.st_gid)
+            return json.dumps(s)
+
 
 
 class PullImageAction(Action):
@@ -322,6 +366,8 @@ class ExecAction(Action):
             container.reload()  # update container status
             INFO("Status: %s" % container.attrs['State']['Status'])
             exit_code = container.attrs['State']['ExitCode']
+            container.stop()
+            container.remove()
             if exit_code == 0:
                 # when success, purge context dir
                 shutil.rmtree(str(context_path))
@@ -329,8 +375,6 @@ class ExecAction(Action):
                 # TODO: instead of stopping, we can mark outgoing dependencies as stalled
                 #  and continue the rest of DAG. Not sure, how useful would be such behaviour
                 raise Exception("Exit code: %s, context dir %s" % (exit_code, context_path))
-            container.stop()
-            container.remove()
 
     def inputs(self) -> set['ValueBase']:
         result = self._inputs.copy()
@@ -464,6 +508,9 @@ class PlanExecutor:
         for action in runlist:
             if any(output.needs_update(context) for output in action.outputs()):
                 action.run(context)
+
+        for value in self.values:
+            value.update_state(context)
 
     def toposorted_actions(self) -> Iterable[Action]:
         """

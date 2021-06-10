@@ -1,0 +1,29 @@
+digraph Foo {
+    node [shape=rectangle, fontsize=12, fontname="Helvetica", label="", color="lightgray", style=filled];
+
+    pull [label="action: pull image", shape=oval, fillcolor="lightblue1"]
+    pandoc [label="value: image pandoc:latest", fillcolor="#ffe0e0"]
+
+    pull->pandoc
+
+    dockerfile [label="value: file my-tool/Dockerfile", fillcolor="#e0ffe0"]
+
+    build_mytool [label="action: build image", shape=oval, shape=oval, fillcolor="lightblue1"]
+    mytool [label="value: image mytool:1.0", fillcolor="#ffe0e0"]
+
+    dockerfile->build_mytool
+    build_mytool->mytool
+
+    run [label="action: exec", shape=oval, shape=oval, fillcolor="lightblue1"]
+    g [label="value: file report.md", fillcolor="#e0ffe0"]
+
+    mytool->run
+    run->g
+
+    run2 [label="action: exec", shape=oval, shape=oval, fillcolor="lightblue1"]
+    y [label="value: file report.html", fillcolor="#e0ffe0"]
+
+    run2->y
+    g->run2
+    pandoc->run2
+}

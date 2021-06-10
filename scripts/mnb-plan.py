@@ -1,4 +1,3 @@
-import os
 from mnb import *
 
 def build_plan(p):
@@ -9,5 +8,4 @@ def build_plan(p):
         elif suffix in [".mindmap", ".plantuml", ".er"]:
             plantuml2png(p, filepath)
     walk_files(p, ".", DEFAULT_IGNORE_DIRS, plan_for_file)
-    return p
 

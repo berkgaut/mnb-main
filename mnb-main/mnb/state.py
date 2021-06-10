@@ -3,18 +3,29 @@ import sqlite3
 class State(object):
     def __init__(self, path):
         self.conn = sqlite3.connect(path)
-        self.conn.execute("""create table if not exists `state1` (`key` text primary key, `token` text)""")
+        self.conn.execute("""create table if not exists state1 (key text primary key, token text)""")
         # TODO: migrations. e.g. https://github.com/clutchski/caribou
 
     def close(self):
+        self.conn.commit()
         self.conn.close()
 
     def __setitem__(self, key, value):
-        self.conn.execute("""insert into `state1` (`key`, `token`) values (?, ?)""", (str(key), str(value)))
+        self.conn.execute("""insert into state1 (key, token) values (:key, :token) on conflict(key) do update set token=:token""", dict(key=str(key), token=str(value)))
 
     def __getitem__(self, key):
-        for tuple in self.conn.execute("""select `token` from `state1` where `key`=?""", (str(key),)):
+        return self.get_by_key(key, None, True)
+
+    def get_by_key(self, key, default, raise_exception):
+        for tuple in self.conn.execute("""select token from state1 where key=:key""", dict(key=str(key))):
             return tuple[0]
+        if raise_exception:
+            raise KeyError(key)
+        else:
+            return default
+
+    def get(self, key, default = None):
+        return self.get_by_key(key, default, False)
 
     def __delitem__(self, key):
         self.conn.execute("""delete from `state1` where `key`=?""", (str(key),))

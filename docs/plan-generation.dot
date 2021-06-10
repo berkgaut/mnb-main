@@ -1,0 +1,16 @@
+digraph Foo {
+
+    node [shape=rectangle, fontsize=12, fontname="Helvetica", label="", color="lightgray", style=filled];
+
+
+    dockerfile [label="value: file plan_generator/Dockerfile", fillcolor="#e0ffe0"]
+    build_mytool [label="action: build image", shape=oval, shape=oval, fillcolor="lightblue1"]
+    mytool [label="value: image plan_generator:1.0", fillcolor="#ffe0e0"]
+    rungen [label="action: exec", shape=oval, shape=oval, fillcolor="lightblue1"]
+    json [label="value: plan JSON"]
+
+    dockerfile->build_mytool
+    build_mytool->mytool
+    mytool->rungen
+    rungen->json
+}
