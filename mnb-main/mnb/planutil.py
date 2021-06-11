@@ -56,14 +56,14 @@ def plantuml2png(p, source, dstsubdir=None):
     p.transform(sources=[src_file],
                 targets=[dst_file],
                 image=plantuml_image(p),
-                command=["-v", "-o", dst_file.workdir(), "-tpng",  src_file.workpath()])
+                command=["-v", "-o", dst_file, "-tpng",  src_file])
 
 def plantuml2pdf(p, source, dstsubdir=None):
     src_file, dst_file = src_dst(p, source, ".pdf", dstsubdir=dstsubdir)
     p.transform(sources=[src_file],
                 targets=[dst_file],
                 image=plantuml_image(p),
-                command=["-v", "-o", dst_file.workdir(), "-tpdf",  src_file.workpath()])
+                command=["-v", "-o", dst_file, "-tpdf",  src_file])
 
 DEFAULT_IGNORE_DIRS = [".mnb.d", ".git", "__pycache__"]
 
