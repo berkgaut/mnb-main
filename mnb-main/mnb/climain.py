@@ -12,10 +12,17 @@ from mnb.log import INFO, WARN, ERROR
 from mnb.state import State
 from mnb.version import MNB_VERSION
 
-def apply_plan(absroot_path, planf: Callable[[Plan], Any]) -> Plan:
+def build_plan(planf: Callable[[Plan], Any]) -> Plan:
     builder = Plan()
     planf(builder)
     return builder
+
+def create_context(absroot_path):
+    client = docker.from_env()
+    state_path = Path(absroot_path) / ".mnb-state.sqlite"
+    state = State(str(state_path))
+    context = Context(client, state, absroot_path)
+    return context
 
 def get_abs_root_path(ns):
     if not ns.rootabspath:
@@ -35,21 +42,22 @@ def get_abs_root_path(ns):
 
 
 def update(ns, planf):
-    absroot_path = get_abs_root_path(ns)
-    p = apply_plan(absroot_path, planf)
-    client = docker.from_env()
-    state_path = Path(absroot_path) / ".mnb-state.sqlite"
-    state = State(str(state_path))
-    context = Context(client, state, absroot_path)
+    plan = build_plan(planf)
+    context = create_context(get_abs_root_path(ns))
     try:
-        executor = PlanExecutor(p)
+        executor = PlanExecutor(plan)
         executor.update(context)
     finally:
         context.close()
 
-def clean(ns, plan_builder):
-    # TODO
-    pass
+def clean(ns, planf):
+    plan = build_plan(planf)
+    context = create_context(get_abs_root_path(ns))
+    try:
+        executor = PlanExecutor(plan)
+        executor.clean(context)
+    finally:
+        context.close()
 
 def showplan(ns, plan_builder):
     # TODO
@@ -115,6 +123,7 @@ def main():
     if n_func_params == 1:
         root_ns.func(root_ns)
     elif n_func_params == 2:
+        # execute plan file and get build_plan function
         plan_file_path = Path(root_ns.plan_file)
         if not plan_file_path.exists():
             raise Exception("Plan file %s does not exist" % plan_file_path)

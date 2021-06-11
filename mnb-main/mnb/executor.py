@@ -90,6 +90,12 @@ class ValueBase(object):
         """
         pass
 
+    def clean(self, context):
+        """
+        Clean underlying resource and state
+        """
+        pass
+
 
 class ImageValue(ValueBase):
     """
@@ -161,6 +167,11 @@ class FileValue(ValueBase):
         actual_state = self._state_value()
         last_known_state = context.state_storage.get(self._state_key())
         return actual_state is None or actual_state != last_known_state
+
+    def clean(self, context):
+        path = Path(self._plan_element.path())
+        if self._producer is not None:
+            path.unlink(missing_ok=True)
 
     def update_state(self, context):
         context.state_storage[self._state_key()] = self._state_value()
@@ -497,8 +508,10 @@ class PlanExecutor:
             a[e] = exec_action
             for inp in e.inputs:
                 exec_action.add_input(v[inp.workfile])
+                v[inp.workfile].add_consumer(exec_action)
             for output in e.outputs:
                 exec_action.add_output(v[output.workfile])
+                v[output.workfile].set_producer(exec_action)
 
         self.actions = set(a.values())
         self.values = set(v.values())
@@ -579,3 +592,7 @@ class PlanExecutor:
             raise Exception("Dependency graph has at least one cycle")
         else:
             return l
+
+    def clean(self, context):
+        for value in self.values:
+            value.clean(context)
