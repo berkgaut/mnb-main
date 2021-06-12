@@ -18,8 +18,11 @@ def build_plan(planf: Callable[[Plan], Any]) -> Plan:
     return builder
 
 def create_context(absroot_path):
+    from mnb.executor import MNB_DIR, ensure_writable_dir
     client = docker.from_env()
-    state_path = Path(absroot_path) / ".mnb-state.sqlite"
+    mnb_dir = Path(absroot_path) / MNB_DIR
+    ensure_writable_dir(mnb_dir)
+    state_path = mnb_dir / "mnb-state.sqlite"
     state = State(str(state_path))
     context = Context(client, state, absroot_path)
     return context
@@ -73,7 +76,7 @@ def run_extension(ns, plan_builder):
 
 def scripts(ns):
     if ns.dev_mode:
-        src_dir_path = Path("scripts")
+        src_dir_path = Path("mnb-main/scripts")
         dst_dir_path = Path(".")
     else:
         from pathlib import PosixPath

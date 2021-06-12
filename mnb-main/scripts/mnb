@@ -47,4 +47,4 @@ docker run \
   --rm \
   bberkgaut/mnb:MNB_VERSION \
   --rootabspath "${PWD}" \
-  $*
+  "$*"

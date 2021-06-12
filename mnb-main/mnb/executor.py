@@ -9,6 +9,8 @@ from typing import Any, Set, Iterable
 
 from mnb.builder import Image, Plan, WorkFile, Exec, InputFile, Stdin, InputFileThroughEnv, OutputStream, OutputFile
 
+MNB_DIR = ".mnb"
+
 VERSION_MAJOR = 1
 VERSION_MINOR = 0
 
@@ -308,8 +310,8 @@ class ExecAction(Action):
     def run(self, context):
         from docker.types import Mount
 
-        ensure_writable_dir(Path(".mnb.d"))
-        with Path(".mnb.d") / str(id(self)) as context_path:
+        ensure_writable_dir(Path(MNB_DIR))
+        with Path(MNB_DIR) / str(id(self)) as context_path:
             ensure_writable_dir(context_path)
             workdir = ensure_writable_dir(context_path / "run")
             mounts = []
