@@ -2,7 +2,8 @@ from mnb import *
 
 def build_plan(p: Plan):
     p.require_api(1,0)
-    p.build_image("bberkgaut/mnb:%s" % MNB_VERSION, context_path=".")
+    # TODO: move build context down, otherwise it results in dependency loop
+    # p.build_image("bberkgaut/mnb:%s" % MNB_VERSION, context_path=".")
 
     # plantuml_dir = Path("containers/plantuml")
     # plantuml_version = (plantuml_dir / "VERSION").read_text().strip()

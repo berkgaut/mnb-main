@@ -107,6 +107,9 @@ class Exec:
                 if cmdel.is_output():
                     self.outputs.append(cmdel)
 
+    def __str__(self):
+        return "exec(%s)" % self.image
+
     def input(self, input: InputT) -> 'Exec':
         self.inputs.append(input)
         return self
@@ -125,6 +128,9 @@ class WorkFile:
         #self.plan = plan
         self.posix_path = PurePosixPath(path)
         self.secret = secret
+
+    def __str__(self):
+        return repr(str(self.posix_path))
 
     def path(self) -> PurePosixPath:
         return self.posix_path
@@ -254,6 +260,9 @@ class Image:
         self.name = name
         self.pull_from_registry = pull_from_registry
         self.build_from_context = build_from_context
+
+    def __str__(self):
+        return self.name
 
     # Hash & equality defined to allow Plan check for conflicting image declarations
     def __eq__(self, o: object) -> bool:

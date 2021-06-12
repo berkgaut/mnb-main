@@ -1,4 +1,5 @@
-import os
+import logging
+import os, sys
 import argparse
 from inspect import signature
 from pathlib import PureWindowsPath, PurePosixPath, Path
@@ -7,8 +8,7 @@ from typing import Callable, Any
 import docker
 
 from mnb.builder import Plan
-from mnb.executor import Context, PlanExecutor, sys
-from mnb.log import INFO, WARN, ERROR
+from mnb.executor import Context, PlanExecutor
 from mnb.state import State
 from mnb.version import MNB_VERSION
 
@@ -27,8 +27,8 @@ def create_context(absroot_path):
 def get_abs_root_path(ns):
     if not ns.rootabspath:
         rootabspath = os.getcwd()
-        WARN("--rootabspath not specified, assuming " + rootabspath)
-        WARN("running without --rootabspath only works outside of container")
+        logging.log(logging.WARN, "--rootabspath not specified, assuming %s", rootabspath)
+        logging.log(logging.WARN, "running without --rootabspath only works outside of container")
     else:
         rootabspath = ns.rootabspath
     if ns.windows_host:
@@ -36,7 +36,7 @@ def get_abs_root_path(ns):
     else:
         absroot_path = PurePosixPath(rootabspath)
     if not absroot_path.is_absolute():
-        ERROR("--contextpath should be an absolute path: %s" % absroot_path)
+        logging.log(logging.ERROR, "--contextpath should be an absolute path: %s", absroot_path)
         exit(1)
     return absroot_path
 
@@ -59,9 +59,10 @@ def clean(ns, planf):
     finally:
         context.close()
 
-def showplan(ns, plan_builder):
-    # TODO
-    pass
+def showplan(ns, planf):
+    plan = build_plan(planf)
+    executor = PlanExecutor(plan)
+    executor.showplan(sys.stdout)
 
 def argparse_test(ns):
     print(ns)
@@ -99,6 +100,7 @@ def main():
     root_parser.add_argument('--windows-host', action='store_true', help="host machine is running Windows (by default Unix-like system is assumed)")
     root_parser.add_argument('--plan-file', default="mnb-plan.py", help="path to plan description")
     root_parser.add_argument('--dev-mode', action='store_true', help="Development mode (run outside of a container)")
+    root_parser.add_argument('--debug', action='store_true', help="Debug mode")
 
     root_ns, rest = root_parser.parse_known_args(cmdline_args)
 
@@ -118,6 +120,11 @@ def main():
     else:
         root_ns.func = run_extension
         root_ns.extension_args = rest
+
+    if root_ns.debug:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
 
     n_func_params = len(signature(root_ns.func).parameters)
     if n_func_params == 1:

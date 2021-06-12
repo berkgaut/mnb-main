@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import shutil
 import threading
 from collections import OrderedDict
@@ -7,11 +8,9 @@ from pathlib import PurePosixPath, Path
 from typing import Any, Set, Iterable
 
 from mnb.builder import Image, Plan, WorkFile, Exec, InputFile, Stdin, InputFileThroughEnv, OutputStream, OutputFile
-from mnb.log import *
 
 VERSION_MAJOR = 1
 VERSION_MINOR = 0
-
 
 class Context(object):
     """
@@ -44,6 +43,10 @@ class Action(object):
     def outputs(self) -> set['ValueBase']:
         """Get list of output values"""
         raise NotImplementedError
+
+    def showplan(self, out):
+        print("%s inputs: %s outputs %s" % (self, ", ".join([str(inp) for inp in self.inputs()]), ", ".join([str(output) for output in self.outputs()])), file=out)
+
 
 
 class ValueBase(object):
@@ -96,6 +99,9 @@ class ValueBase(object):
         """
         pass
 
+    def showplan(self, out):
+        print("%s producer %s consumers %s" % (self, self.producer(), ", ".join([str(consumer) for consumer in self.consumers()])), file=out)
+
 
 class ImageValue(ValueBase):
     """
@@ -106,6 +112,9 @@ class ImageValue(ValueBase):
     def __init__(self, plan_element: Image):
         super().__init__()
         self._plan_element = plan_element
+
+    def __str__(self):
+        return str(self._plan_element)
 
     def _name(self) -> str:
         return self._plan_element.name
@@ -160,6 +169,9 @@ class FileValue(ValueBase):
         super().__init__()
         self._plan_element = plan_element
 
+    def __str__(self):
+        return "file(%s)" % self._plan_element
+
     def prepare(self, context):
         pass
 
@@ -205,6 +217,9 @@ class PullImageAction(Action):
     def __init__(self, plan_element: Image):
         self._plan_element = plan_element
 
+    def __str__(self):
+        return "pull(%s)" % self._plan_element
+
     def set_output_image(self, image_value: RegistryImageValue):
         self._image_value = image_value
 
@@ -222,9 +237,9 @@ class PullImageAction(Action):
             tag = "latest"
         else:
             tag = e[1]
-        INFO("Pulling " + self._name())
+        logging.log(logging.INFO, "Pulling %s", self._name())
         for line in low_level_api.pull(repo, tag=tag, stream=True, decode=True):
-            INFO(line)
+            logging.log(logging.INFO, line)
 
     def _name(self):
         return self._plan_element.name
@@ -252,6 +267,9 @@ class BuildImageAction(Action):
     def __init__(self, plan_element: Image):
         self._plan_element = plan_element
 
+    def __str__(self):
+        return "build_image(%s)" % self._plan_element
+
     def inputs(self) -> set[ValueBase]:
         return self._inputs
 
@@ -262,13 +280,13 @@ class BuildImageAction(Action):
         self._image_value = image_value
 
     def run(self, context):
-        INFO("Building " + self._plan_element.name)
+        logging.log(logging.INFO, "Building %s", self._plan_element.name)
         # TODO: create context copy, copy only sources to context
         (image, logs) = context.docker_client.images.build(path=str(self._plan_element.build_from_context),
                                                            tag=self._plan_element.name,
                                                            rm=False)
         for line in logs:
-            INFO(line)
+            logging.log(logging.INFO, line)
 
     def add_input(self, value: ValueBase):
         self._inputs.add(value)
@@ -283,6 +301,9 @@ class ExecAction(Action):
     def __init__(self, plan_fragment: Exec, image: ImageValue):
         self._plan_fragment = plan_fragment
         self._image = image
+
+    def __str__(self):
+        return str(self._plan_fragment)
 
     def run(self, context):
         from docker.types import Mount
@@ -327,9 +348,9 @@ class ExecAction(Action):
                                 target="/mnb/run",
                                 type="bind",
                                 read_only=False))
-            INFO("command: %s" % self._plan_fragment.command)
-            INFO("environment: %s" % env)
-            INFO("mounts: %s" % mounts)
+            logging.log(logging.INFO, "command: %s", self._plan_fragment.command)
+            logging.log(logging.INFO, "environment: %s", env)
+            logging.log(logging.INFO, "mounts: %s", mounts)
             container = context.docker_client.containers.create(
                 self._plan_fragment.image.name,
                 self._plan_fragment.command,
@@ -347,7 +368,7 @@ class ExecAction(Action):
                                                                 demux=True))
             container.start()
             if len(stdin_sources) > 0:
-                INFO("stdin sources: %s" % stdin_sources)
+                logging.log(logging.INFO, "stdin sources: %s", stdin_sources)
                 # TODO: concatenate multiple input streams
                 stdin_stream = Path(stdin_sources[0].workfile.posix_path).open("rb")
             else:
@@ -378,8 +399,8 @@ class ExecAction(Action):
                         with Path(target.workfile.posix_path).open('wb') as o:
                             o.write(data)
             container.reload()  # update container status
-            INFO("Status: %s" % container.attrs['State']['Status'])
             exit_code = container.attrs['State']['ExitCode']
+            logging.log(logging.INFO, "Exit status: %d", exit_code)
             container.stop()
             container.remove()
             if exit_code == 0:
@@ -416,7 +437,7 @@ def receiver(sock, stdout_stream, stderr_stream):
         if stream == 1:
             stdout_stream.write(received)
         else:
-            INFO("stderr: %s" % received.decode('utf-8'))
+            logging.log(logging.INFO, "stderr: %s", received.decode('utf-8'))
             stderr_stream.write(received)
 
 
@@ -498,6 +519,7 @@ class PlanExecutor:
                 for directory in directories.keys():
                     if directory.is_relative_to(image_value._plan_element.build_from_context):
                         for file_value in directories[directory]:
+                            logging.info("Implied dependency %s->%s", file_value, build_image_action)
                             build_image_action.add_input(file_value)
 
         for e in self.plan.execs():
@@ -517,7 +539,7 @@ class PlanExecutor:
         self.values = set(v.values())
 
     def update(self, context):
-        INFO("update")
+        logging.log(logging.INFO, "update")
         for value in self.values:
             value.prepare(context)
 
@@ -540,6 +562,9 @@ class PlanExecutor:
         # 2. Perform a toposort over actions (using Kahn's algorithm https://en.wikipedia.org/wiki/Topological_sorting)
         #
         # Q: Maybe reuse https://github.com/pombredanne/bitbucket.org-ericvsmith-toposort
+        #
+        # TODO: Consider using Tarjan's strongly connected components algorithm
+        # Rationale: Tarjan's SCC would find loops and produce a helpful diagnostic
 
         # 1. Dependency graph representation optimized for toposort
         o: dict[Action, set[Action]] = {}  # for actions: action -> set of outgoing dependency edges
@@ -596,3 +621,10 @@ class PlanExecutor:
     def clean(self, context):
         for value in self.values:
             value.clean(context)
+
+    def showplan(self, out):
+        for value in self.values:
+            value.showplan(out)
+        for action in self.actions:
+            action.showplan(out)
+
