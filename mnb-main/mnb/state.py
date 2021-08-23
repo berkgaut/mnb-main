@@ -27,6 +27,16 @@ class State(object):
     def get(self, key, default = None):
         return self.get_by_key(key, default, False)
 
+    def dump(self, out):
+        for tuple in self.conn.execute("""select * from state1"""):
+            key, token = tuple
+            out.write("Key: ")
+            out.write(key)
+            out.write("\n")
+            out.write("  Token: ")
+            out.write(token)
+            out.write("\n")
+
     def __delitem__(self, key):
         self.conn.execute("""delete from `state1` where `key`=?""", (str(key),))
 

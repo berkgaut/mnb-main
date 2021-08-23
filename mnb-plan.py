@@ -20,8 +20,8 @@ def graphviz_image(p):
     return p.build_image("bberkgaut/graphviz:%s" % graphviz_version, context_path=graphviz_dir)
 
 def dot2png(p: Plan, source: [str, PurePosixPath], dstsubdir=None):
-    src_file, dst_file = src_dst(p, source, ".png", dstsubdir=dstsubdir)
+    src_file, dst_file = src_dst(p, source, ".svg", dstsubdir=dstsubdir)
     return p.exec(image=graphviz_image(p),
-           command=["dot", "-Tpng",
+           command=["dot", "-Tsvg",
                     "-o", dst_file,
                     src_file])

@@ -1,3 +1,2 @@
-voluptuous==0.11.7
-PyYAML==5.3.1
 docker==4.0.2
+gitignore-parser==0.0.8

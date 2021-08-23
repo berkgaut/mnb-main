@@ -70,6 +70,10 @@ def showplan(ns, planf):
 def argparse_test(ns):
     print(ns)
 
+def dumpstate(ns):
+    context = create_context(get_abs_root_path(ns))
+    context.state_storage.dump(sys.stdout)
+
 def run_extension(ns, plan_builder):
     # TODO
     pass
@@ -120,6 +124,8 @@ def main():
         root_ns.func = scripts
     elif rest[0] == "argparse-test":
         root_ns.func = argparse_test
+    elif rest[0] == "dumpstate":
+        root_ns.func = dumpstate
     else:
         root_ns.func = run_extension
         root_ns.extension_args = rest

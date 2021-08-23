@@ -563,7 +563,7 @@ class PlanExecutor:
         #
         # 2. Perform a toposort over actions (using Kahn's algorithm https://en.wikipedia.org/wiki/Topological_sorting)
         #
-        # Q: Maybe reuse https://github.com/pombredanne/bitbucket.org-ericvsmith-toposort
+        # TODO: switch to graphlib from standard library
         #
         # TODO: Consider using Tarjan's strongly connected components algorithm
         # Rationale: Tarjan's SCC would find loops and produce a helpful diagnostic
