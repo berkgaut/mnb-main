@@ -1,24 +1,34 @@
 from mnb.builder import Plan
 import unittest
 
-
 class PlanBuilderTest(unittest.TestCase):
 
-    def test_simple_plan(self):
+    def assertJsonPreservesPlan(self, plan):
+        json = plan.to_json()
+        from pprint import pprint
+        pprint(json)
+        self.assertEqual(json, Plan.from_json(json).to_json())
+
+    def test_all_plan_elements(self):
         plan = Plan()
-        image_foo = plan.image("foo").from_registry()
-        src_file_a = plan.file("source_A") #, through_file="foo_input_file", through_stdin=False, through_env=False, preprocessor=None)
-        dst_file_b = plan.file("file_B") #, through_file="foo_output_file")
-        plan.exec(image_foo, ["echo", "foo"],
-                         inputs=[src_file_a.as_input()],
-                         outputs=[dst_file_b.as_output()])
-        src_file_b = plan.file("file_B") #, through_file="bar_input_file")
-        dst_file_c = plan.file("file_C") #, through_file="bar_output_file")
-        image_bar = plan.image("bar").from_context("containers/bar")
-        aws_creds = plan.file(".aws/credentials", secret=True).as_input()
-        aws_config = plan.file(".aws/config", secret=True).as_input()
-        plan.exec(image_bar, ["bar", src_file_b.as_input(through_path="src")],
-                         outputs=[dst_file_c.as_output()], entrypoint="entrypoint").input(aws_creds).input(aws_config)
+        image_foo = plan.pull_image("foo")
+        plan.exec(image_foo, ["/bin/sh", "-c", "echo aaa"])
+        self.assertJsonPreservesPlan(plan)
 
+    def test_empty_plan(self):
+        self.assertJsonPreservesPlan(Plan())
 
+    def test_build(self):
+        plan = Plan()
+        plan.build_image("foo", "path/to/context")
+        self.assertJsonPreservesPlan(plan)
 
+    def test_exec(self):
+        plan = Plan()
+        file_a = plan.file("A")
+        file_b = plan.file("B")
+        plan.exec(plan.pull_image("foo"), ["aaa"],
+                  inputs=[file_a.as_input(through_path="AAA"), file_a.through_stdin(), file_a.through_env("VAR")],
+                  outputs=[file_b.as_output(), file_b.through_stderr(), file_b.through_stdout()],
+                  entrypoint="/docker/entrypoint.sh")
+        self.assertJsonPreservesPlan(plan)

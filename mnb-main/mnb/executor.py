@@ -412,6 +412,7 @@ class ExecAction(Action):
                 # TODO: instead of stopping, we can mark outgoing dependencies as stalled
                 #  and continue the rest of DAG. Not sure, how useful would be such behaviour
                 raise Exception("Exit code: %s, context dir %s" % (exit_code, context_path))
+            return ExecResult(exit_code, stdout_stream.getvalue())
 
     def inputs(self) -> set['ValueBase']:
         result = self._inputs.copy()
@@ -426,6 +427,12 @@ class ExecAction(Action):
 
     def add_output(self, output: ValueBase):
         self._outputs.add(output)
+
+
+class ExecResult:
+    def __init__(self, exit_code, stdout_bytes):
+        self.exit_code=exit_code
+        self.stdout_bytes=stdout_bytes
 
 
 def receiver(sock, stdout_stream, stderr_stream):
@@ -540,18 +547,25 @@ class PlanExecutor:
         self.actions = set(a.values())
         self.values = set(v.values())
 
-    def update(self, context):
+    def update(self, context, always_run_last=False) -> ExecResult:
         logging.log(logging.INFO, "update")
         for value in self.values:
             value.prepare(context)
 
         runlist = self.toposorted_actions()
+        if always_run_last:
+            goal = runlist[-1]
+        else:
+            goal = None
+        last_result = None
         for action in runlist:
-            if any(output.needs_update(context) for output in action.outputs()):
-                action.run(context)
+            if action == goal or any(output.needs_update(context) for output in action.outputs()):
+                last_result = action.run(context)
 
         for value in self.values:
             value.update_state(context)
+
+        return last_result
 
     def toposorted_actions(self) -> Iterable[Action]:
         """
@@ -629,4 +643,7 @@ class PlanExecutor:
             value.showplan(out)
         for action in self.actions:
             action.showplan(out)
+
+    def dump_plan(self, out):
+        print(json.dumps(self.plan.to_json(), sort_keys=True, indent=2), file=out)
 

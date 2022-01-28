@@ -1,3 +1,4 @@
+import json
 import logging
 import os, sys
 import argparse
@@ -11,11 +12,6 @@ from mnb.builder import Plan
 from mnb.executor import Context, PlanExecutor
 from mnb.state import State
 from mnb.version import MNB_VERSION
-
-def build_plan(planf: Callable[[Plan], Any]) -> Plan:
-    builder = Plan()
-    planf(builder)
-    return builder
 
 def create_context(absroot_path):
     from mnb.executor import MNB_DIR, ensure_writable_dir
@@ -44,17 +40,15 @@ def get_abs_root_path(ns):
     return absroot_path
 
 
-def update(ns, planf):
-    plan = build_plan(planf)
+def update(ns, plan, always_run_last=False):
     context = create_context(get_abs_root_path(ns))
     try:
         executor = PlanExecutor(plan)
-        executor.update(context)
+        return executor.update(context, always_run_last)
     finally:
         context.close()
 
-def clean(ns, planf):
-    plan = build_plan(planf)
+def clean(ns, plan):
     context = create_context(get_abs_root_path(ns))
     try:
         executor = PlanExecutor(plan)
@@ -62,10 +56,13 @@ def clean(ns, planf):
     finally:
         context.close()
 
-def showplan(ns, planf):
-    plan = build_plan(planf)
+def showplan(ns, plan):
     executor = PlanExecutor(plan)
     executor.showplan(sys.stdout)
+
+def dump_plan(ns, plan):
+    executor = PlanExecutor(plan)
+    executor.dump_plan(sys.stdout)
 
 def argparse_test(ns):
     print(ns)
@@ -74,7 +71,7 @@ def dumpstate(ns):
     context = create_context(get_abs_root_path(ns))
     context.state_storage.dump(sys.stdout)
 
-def run_extension(ns, plan_builder):
+def run_extension(ns, plan):
     # TODO
     pass
 
@@ -105,7 +102,7 @@ def main():
     root_parser = argparse.ArgumentParser(prog='mnb')
     root_parser.add_argument('--rootabspath', nargs='?', help="Absolute path to working context on host machine")
     root_parser.add_argument('--windows-host', action='store_true', help="host machine is running Windows (by default Unix-like system is assumed)")
-    root_parser.add_argument('--plan-file', default="mnb-plan.py", help="path to plan description")
+    root_parser.add_argument('--mnb-file', default="mnb-plan.json", help="path to mnb plan file")
     root_parser.add_argument('--dev-mode', action='store_true', help="Development mode (run outside of a container)")
     root_parser.add_argument('--debug', action='store_true', help="Debug mode")
 
@@ -120,6 +117,8 @@ def main():
         root_ns.func = clean
     elif rest[0] == "showplan":
         root_ns.func = showplan
+    elif rest[0] == "dumpplan":
+        root_ns.func = dump_plan
     elif rest[0] == "scripts":
         root_ns.func = scripts
     elif rest[0] == "argparse-test":
@@ -139,17 +138,20 @@ def main():
     if n_func_params == 1:
         root_ns.func(root_ns)
     elif n_func_params == 2:
-        # execute plan file and get build_plan function
-        plan_file_path = Path(root_ns.plan_file)
-        if not plan_file_path.exists():
-            raise Exception("Plan file %s does not exist" % plan_file_path)
-        plan_env = dict()
-        exec(plan_file_path.open("r").read(), plan_env)
-        BUILD_PLAN = 'build_plan'
-        if not BUILD_PLAN in plan_env:
-            raise Exception("Function %s not defined in plan file %s" % (BUILD_PLAN, plan_file_path))
-        plan_builder = plan_env[BUILD_PLAN]
-        root_ns.func(root_ns, plan_builder)
+        mnb_file_path = Path(root_ns.mnb_file)
+        if not mnb_file_path.exists():
+            raise Exception("Plan file %s does not exist" % mnb_file_path)
+        with mnb_file_path.open("r") as mnb_file:
+            metaplan_data = json.loads(mnb_file.read())
+            metaplan = Plan()
+            metaplan.from_json(metaplan_data)
+            metaplan_result = update(root_ns, metaplan, always_run_last=True)
+            if metaplan_result.exit_code != 0:
+                raise Exception
+            plan_data = json.loads(metaplan_result.stdout_bytes)
+            plan = Plan()
+            plan.from_json(plan_data)
+            root_ns.func(root_ns, plan)
 
 if __name__=="__main__":
     main()

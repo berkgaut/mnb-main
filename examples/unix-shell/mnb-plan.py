@@ -2,7 +2,6 @@ from mnb import *
 
 def build_plan(p: Plan):
     p.require_api(1,0)
-    p.build_image("bberkgaut/mnb:%s" % MNB_VERSION, context_path=".")
 
     sample_txt = p.file("sample.txt")
     bash_image = p.pull_image('bash')
