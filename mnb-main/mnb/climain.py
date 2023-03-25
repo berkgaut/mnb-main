@@ -143,8 +143,7 @@ def main():
             raise Exception("Plan file %s does not exist" % mnb_file_path)
         with mnb_file_path.open("r") as mnb_file:
             metaplan_data = json.loads(mnb_file.read())
-            metaplan = Plan()
-            metaplan.from_json(metaplan_data)
+            metaplan = Plan.from_json(metaplan_data)
             metaplan_result = update(root_ns, metaplan, always_run_last=True)
             if metaplan_result.exit_code != 0:
                 raise Exception

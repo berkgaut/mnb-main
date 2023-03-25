@@ -2,14 +2,18 @@ import itertools
 from pathlib import PurePosixPath
 from typing import Union, Optional, Tuple, Iterable
 
+
 class PlanBuilderException(Exception):
     pass
 
-class PlanParsinExceotion(Exception):
+
+class PlanParsinException(Exception):
     pass
+
 
 InputT = Union['InputFile', 'Stdin', 'InputFileThroughEnv']
 OutputT = Union['OutputFile', 'OutputStream']
+
 
 class Plan:
     """
@@ -103,6 +107,7 @@ class Plan:
         parser.process(data)
         return plan
 
+
 class PlanParser:
     def __init__(self, plan):
         self.plan = plan
@@ -188,14 +193,22 @@ class PlanParser:
         else:
             raise Exception("invalid value: %s" % data)
 
+
 class Exec:
+    """
+    Represents an execution of an image in a newly created container, passing input values via files/environment/stdin
+    and receiving output values via files/stdout/stderr
+
+    Input/output values could be passed explicitly via inputs and outputs arguments,
+    or specified implicitly by placing them in command line.
+    """
     image: 'Image'
     command: list[str]
     inputs: list[InputT]
     outputs: list[OutputT]
     entrypoint: Optional[str]
 
-    def __init__(self, image, command, inputs, outputs, entrypoint):
+    def __init__(self, image: 'Image', command: list[Union[str, 'CommandElement']], inputs: list[InputT], outputs: list[OutputT], entrypoint: Optional[str]):
         if inputs is None:
             inputs = list()
         if outputs is None:
@@ -236,6 +249,9 @@ class Exec:
 
 
 class WorkFile:
+    """
+    Represents a file on host file system which could be used as an input or output of containers
+    """
     posix_path: PurePosixPath
     secret: bool
 
@@ -253,25 +269,43 @@ class WorkFile:
         raise NotImplementedError("as of yet")
 
     def as_input(self, through_path: Optional[Union[str, PurePosixPath]] = None) -> 'InputFile':
+        """
+        Pass file as an input file
+        """
         return InputFile(self, through_path)
 
     def through_stdin(self) -> 'Stdin':
+        """
+        Pass file via stdin
+        """
         return Stdin(self)
 
     def through_env(self, name: str) -> 'InputFileThroughEnv':
+        """
+        Pass file via an environment variable
+        """
         return InputFileThroughEnv(self, name)
 
     def as_output(self, through_path=None) -> 'OutputFile':
+        """
+        Receive file via a file
+        """
         if self.secret:
             raise PlanBuilderException("secrets could not be outputs")
         return OutputFile(self, through_path)
 
     def through_stdout(self) -> 'OutputStream':
+        """
+        Receive file via stdout
+        """
         if self.secret:
             raise PlanBuilderException("secrets could not be outputs")
         return OutputStream(self, stdout=True)
 
     def through_stderr(self) -> 'OutputStream':
+        """
+        Receive file via stderr
+        """
         if self.secret:
             raise PlanBuilderException("secrets could not be outputs")
         return OutputStream(self, stderr=True)
@@ -281,17 +315,35 @@ class WorkFile:
 
 
 class CommandElement:
+    """
+    Command elements are a shorthand mechanism allowing to add objects representing inputs and outputs
+    directly to a list of command elements (command parameter of Exec).
+
+    Such object get converted into strings via as_command_element method and are appended to inputs or outputs lists
+    """
     def as_command_element(self) -> str:
+        """
+        Command-line representation
+        """
         raise NotImplementedError
 
     def is_input(self) -> bool:
+        """
+        Returns true if object represents an input value
+        """
         raise NotImplementedError
 
     def is_output(self) -> bool:
+        """
+        Returns true if object represents an output value
+        """
         return not self.is_input()
 
 
 class InputFile(CommandElement):
+    """
+    Represents passing of an input value via a file
+    """
     workfile: WorkFile
     through_path: PurePosixPath
 
@@ -316,6 +368,9 @@ class InputFile(CommandElement):
 
 
 class InputFileThroughEnv:
+    """
+    Represents passing of an input via an environment variable
+    """
     workfile: WorkFile
     name: str
 
@@ -331,6 +386,9 @@ class InputFileThroughEnv:
 
 
 class OutputFile(CommandElement):
+    """
+    Represents receiving of an output value via a file
+    """
     workfile: WorkFile
     through_path: PurePosixPath
 
@@ -358,6 +416,9 @@ class OutputFile(CommandElement):
 
 
 class Stdin:
+    """
+    Represents passing of an input value through stdin
+    """
     workfile: WorkFile
 
     def __init__(self, workfile):
@@ -375,7 +436,11 @@ class Stdin:
     def _to_json1(self):
         return dict(stdin=dict())
 
+
 class OutputStream:
+    """
+    Represents passing receiving of an output value through stdout or stderr
+    """
     workfile: WorkFile
     through_stdout: bool = False
     through_stderr: bool = False
@@ -397,6 +462,9 @@ class OutputStream:
 
 
 class Image:
+    """
+    Represents an image which is being pulled from a repository or build
+    """
     name: str
     build_from_context: Optional[PurePosixPath]
     pull_from_registry: bool
