@@ -1,0 +1,223 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://purl.org/mnbproject/spec/0.1/schema",
+  "type": "object",
+  "required": ["spec_version", "actions"],
+  "additionalProperties": false,
+  "properties": {
+    "spec_version": {"type": "string"},
+    "actions": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["pull_image"],
+            "additionalProperties": false,
+            "properties": {
+              "pull_image": {
+                "type": "object",
+                "required": ["image_name"],
+                "additionalProperties": false,
+                "properties": {
+                  "image_name": {"type": "string"}
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["build_image"],
+            "additionalProperties": false,
+            "properties": {
+              "build_image": {
+                "type": "object",
+                "required": ["image_name","context_path"],
+                "additionalProperties": false,
+                "properties": {
+                  "image_name": {"type": "string"},
+                  "dockerfile_path": { "type": "string" },
+                  "context_path": { "type": "string" },
+                  "build_args": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["name", "value"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": { "type": "string" },
+                        "value": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["exec"],
+            "additionalProperties": false,
+            "properties": {
+              "exec": {
+                "type": "object",
+                "required": ["image_name"],
+                "properties": {
+                  "image_name": {"type": "string"},
+                  "command": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  },
+                  "entrypoint": {"type": "string"},
+                  "inputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["value", "through"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "value": {
+                          "$ref": "#/definitions/value"
+                        },
+                        "through": {
+                          "oneOf": [
+                            {"$ref": "#/definitions/through_file"},
+                            {"$ref": "#/definitions/through_environment"},
+                            {"$ref": "#/definitions/through_input_stream"},
+                            {"$ref": "#/definitions/through_dir"}
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "outputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["value", "through"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "value": {"$ref": "#/definitions/value"},
+                        "through": {
+                          "oneOf": [
+                            {"$ref": "#/definitions/through_file"},
+                            {"$ref": "#/definitions/through_output_stream"},
+                            {"$ref": "#/definitions/through_dir"}
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "value": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["file"],
+          "additionalProperties": false,
+          "properties": {
+            "file": {
+              "type": "object",
+              "required": ["path"],
+              "additionalProperties": false,
+              "properties": {"path": {"type": "string"}}
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["dir"],
+          "additionalProperties": false,
+          "properties": {
+            "dir": {
+              "type": "object",
+              "required": ["path"],
+              "additionalProperties": false,
+              "properties": {"path": {"type": "string"}}
+            }
+          }
+        }
+      ]
+    },
+    "through_file": {
+      "type": "object",
+      "required": ["file"],
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "object",
+          "required": ["path"],
+          "additionalProperties": false,
+          "properties": {"path": {"type": "string"}}
+        }
+      }
+    },
+    "through_input_stream": {
+      "type": "object",
+      "required": ["stream"],
+      "additionalProperties": false,
+      "properties": {
+        "stream": {
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {"type": "string", "enum": ["STDIN"]}
+          }
+        }
+      }
+    },
+    "through_output_stream": {
+      "type": "object",
+      "required": ["stream"],
+      "additionalProperties": false,
+      "properties": {
+        "stream": {
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {"type": "string", "enum": ["STDOUT", "STDERR"]}
+          }
+        }
+      }
+    },
+    "through_environment": {
+      "type": "object",
+      "required": ["environment"],
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {"name": {"type": "string"}}
+        }
+      }
+    },
+    "through_dir": {
+      "type": "object",
+      "required": ["dir"],
+      "additionalProperties": false,
+      "properties": {
+        "dir": {
+          "type": "object",
+          "required": ["path"],
+          "additionalProperties": false,
+          "properties": {
+            "path": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}

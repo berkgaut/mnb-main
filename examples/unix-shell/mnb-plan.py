@@ -1,16 +1,18 @@
-from mnb import *
+from spec import *
 
-def build_plan(p: Plan):
-    p.require_api(1,0)
+from spec_json import print_spec_json
 
-    sample_txt = p.file("sample.txt")
-    bash_image = p.pull_image('bash')
-    p.exec(bash_image,
-           ["bash", "-c", "echo '-*- Hallo -*-'"],
-           outputs=[sample_txt.through_stdout()])
-    p.exec(bash_image,
-           ["bash", "-c", 'read X; sleep 1; >&2 echo "X=${X}"; echo Hello stdout ${SAMPLE_DAT}'],
-           inputs=[sample_txt.through_stdin(),
-                   sample_txt.through_env("SAMPLE_DAT")],
-           outputs=[p.file("stdout").through_stdout(),
-                    p.file("stderr").through_stderr()])
+s = Spec(spec_version=(1,0))
+file_1 = "file_1"
+bash_image = "bash"
+s.pull_image(bash_image)
+cmd1 = s.exec(bash_image, command=["bash", "-c", "echo '-*- Hallo -*-'"])
+cmd1.output(file_1, through_stdout=True)
+cmd2 = s.exec(bash_image, command=["bash", "-c", '>&2 echo "X=${X}"; echo "Hello stdout!"'])
+from_stderr = "from_stderr"
+from_stdout = "from_stdout"
+cmd2.input(file=file_1, through_env='X')
+cmd2.output(file=from_stderr, through_stderr=True)
+cmd2.output(file=from_stdout, through_stdout=True)
+
+print_spec_json(s)

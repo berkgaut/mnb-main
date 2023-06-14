@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
+# GENERATED - DO NOT EDIT
 #
 # Startup script for mnb utility, see https://github.com/berkgaut/mnb-main
 #
 
+# Mount docker socket
 if [ -S /var/run/docker.sock ]
 then
     DOCKER_HOST=
@@ -11,6 +13,13 @@ else
     DOCKER_HOST=tcp://host.docker.internal:2375
     docker_sock_mount=
 fi
+
+# TODO: mount SSH_AUTH_SOCK
+
+# TODO: mount .aws
+# TODO: pass AWS* environment variables
+
+# TODO custom mounts & variables
 
 docker run \
   --env DOCKER_HOST \

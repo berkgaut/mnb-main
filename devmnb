@@ -1,41 +1,66 @@
 #!/usr/bin/env bash
-
 # Startup script to run mnb outside of container (requires python3)
 
 set -o errexit
+set -o pipefail
+set -o nounset
 
-if [ ! -d ./mnb-main/venv ]
+# Determine directory where devmnb is located
+MNB_DIR=$(cd -P "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)
+echo "MNB_DIR=${MNB_DIR}"
+SRC_DIR="${MNB_DIR}/src"
+
+if which python3 > /dev/null
 then
-    mkdir ./mnb-main/venv
-    python3 -m venv ./mnb-main/venv || (rm -rf ./mnb-main/venv; exit 1)
+  PYTHON=python3
+elif python -c 'import sys; exit(0 if sys.version_info[0]==3 else 1)'
+then
+  PYTHON=python
+else
+  echo "Python 3 is required"
+  exit 1
+fi
+echo "PYTHON=${PYTHON}"
+
+VENV_DIR="${MNB_DIR}/venv"
+if [ ! -d "${VENV_DIR}" ]
+then
+  echo "Create virtualenv in ${VENV_DIR}"
+  mkdir "$VENV_DIR"
+  ${PYTHON} -m venv "${VENV_DIR}"
 fi
 
-if [ -f ./mnb-main/venv/bin/activate ]
+if [ -f "${VENV_DIR}/bin/activate" ]
 then
-    source ./mnb-main/venv/bin/activate
-elif [ -f  ./mnb-main/venv/Scripts/activate ] # MSYS Windows
+    VENV_ACTIVATE="${VENV_DIR}/bin/activate"
+elif [ -f  "${VENV_DIR}/Scripts/activate" ] # MSYS Windows
 then
-    source  ./mnb-main/venv/Scripts/activate
-elif [ -f ./mnb-main/venv/usr/local/bin/activate ] # macOS
+    VENV_ACTIVATE="${VENV_DIR}/Scripts/activate"
+elif [ -f "${VENV_DIR}/usr/local/bin/activate" ] # macOS
 then
-    source ./mnb-main/venv/usr/local/bin/activate
+    VENV_ACTIVATE="${VENV_DIR}/usr/local/bin/activate"
 else
-    echo "Could not find virtualenv activation script"
+    echo "Could not find virtualenv activation script in directory $VENV_DIR"
     exit 1
 fi
 
-python3 -m pip install -r ./mnb-main/requirements.txt
+echo "Activate virtualenv via ${VENV_ACTIVATE}"
+source "${VENV_ACTIVATE}"
+
+echo "Install requirements"
+${PYTHON} -m pip install -r "${SRC_DIR}/mnb-core/requirements.txt"
 
 if [ -S /var/run/docker.sock ]
 then
-	docker_host=
+	export DOCKER_HOST=
 else
-	docker_host=tcp://localhost:2375
+	export DOCKER_HOST=tcp://localhost:2375
 fi
+echo "DOCKER_HOST=${DOCKER_HOST}"
 
-env \
-  DOCKER_HOST=$docker_host \
-  PYTHONPATH=./mnb-main \
-python3 mnb-main/mnb/climain.py --dev-mode $*
+export PYTHONPATH="${SRC_DIR}/mnb-core:${SRC_DIR}/mnb-spec"
+echo "PYTHONPATH=${PYTHONPATH}"
 
+export MNB_LIB="${SRC_DIR}/mnb-core/lib"
 
+python3 "${SRC_DIR}/mnb-core/main.py" --dev-mode --rootabspath "${MNB_DIR}" "$@"

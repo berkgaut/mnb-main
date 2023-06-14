@@ -1,0 +1,20 @@
+{
+  "actions": [
+    {"build_image": {
+      "image_name": "bberkgaut/mnb-spec-python",
+      "context_path": ".",
+      "dockerfile_path": "containers/mnb-spec-python/Dockerfile"
+    }},
+    {"build_image": {
+      "image_name": "spec-gen",
+      "context_path": ".",
+      "dockerfile_path": "examples/python-with-extras/Dockerfile"
+    }},
+    {"exec": {
+      "image_name": "spec-gen",
+      "command": ["python3", "examples/python-base/mnb-spec.py"],
+      "workdir": "context",
+      "inputs": [{"value": {"dir": {"path": "."}}, "through": {"dir": {"path": "context"}}}]
+    }}
+  ]
+}
