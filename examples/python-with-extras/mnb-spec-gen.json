@@ -1,4 +1,5 @@
 {
+  "spec_version": "1.0",
   "actions": [
     {"build_image": {
       "image_name": "bberkgaut/mnb-spec-python",
@@ -12,7 +13,7 @@
     }},
     {"exec": {
       "image_name": "spec-gen",
-      "command": ["python3", "examples/python-base/mnb-spec.py"],
+      "command": ["python3", "examples/python-with-extras/mnb-spec.py"],
       "workdir": "context",
       "inputs": [{"value": {"dir": {"path": "."}}, "through": {"dir": {"path": "context"}}}]
     }}

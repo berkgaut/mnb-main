@@ -1,15 +1,38 @@
+import json
+import sys
+from pathlib import PosixPath
+
+import marko
+from marko.ast_renderer import ASTRenderer
+
 from spec import *
 from spec_json import print_spec_json
-import marko
 
 s = Spec(spec_version=(1, 0))
-s.pull_image("foo")
-s.build_image("bar", context_path="containers/bar")
 
-x2y = s.exec("foo", command=["convert", "input", "output"])
-x2y.input(file="x", through_file="input")
-x2y.output(file="y", through_file="output")
+file_path = PosixPath("examples/python-with-extras") / "example.md"
 
-s.exec("bar", command=["postprocess", "y", "z"]).input(file="y").output(file="z")
+with file_path.open("r") as file:
+    ast = marko.parse(file.read())
+    render = ASTRenderer()
+    json.dump(render.render(ast), indent=2, fp=sys.stderr)
+
+    # get options encoded in link def syntax
+    generated_dir = ast.link_ref_defs.get("mnb-graphviz:generated_dir", ("generated", None))[0]
+
+    image_list = []
+
+    for (id, link_def) in ast.link_ref_defs.items():
+        if id.startswith("mnb-graphviz:"):
+            # option
+            continue
+        dest, title = link_def
+        if str((file_path.parent / dest).parent) == generated_dir:
+            image_list.append(dest)
+
+
+
+
+
 
 print_spec_json(s)
