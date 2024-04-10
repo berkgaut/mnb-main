@@ -1,0 +1,49 @@
+{
+  "description": "mnb workspace for mnb project",
+  "spec_version": "1.0",
+  "generators": [
+    {
+      "generator": {
+        "description": "Python-based spec for shell example",
+        "actions": [
+          {
+            "build_image": {
+              "image_name": "bberkgaut/mnb-spec-python",
+              "context_path": ".",
+              "dockerfile_path": "containers/mnb-spec-python/Dockerfile"
+            }
+          },
+          {
+            "exec": {
+              "image_name": "bberkgaut/mnb-spec-python",
+              "command": [
+                "python3",
+                "examples/unix-shell/mnb-spec.py"
+              ],
+              "workdir": "context",
+              "inputs": [
+                {
+                  "value": {
+                    "dir": {
+                      "path": "."
+                    }
+                  },
+                  "through": {
+                    "dir": {
+                      "path": "context"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+        {
+      "include": {
+        "path": "examples/python-base/mnb-generator.json"
+      }
+    }
+  ]
+}

@@ -1,18 +1,20 @@
 from spec import *
 from spec_json import print_spec_json
 
-s = Spec(spec_version=(1, 0), actions=[])
-pull_image_foo = PullImage("foo")
-s.actions.append(pull_image_foo)
-build_image_bar = BuildImage("bar", context_path="containers/bar", build_args={})
-s.actions.append(build_image_bar)
-foo_a_to_b = Exec(image_name="foo", inputs=[Input(value=File("a"), through=ThroughFile("a"))],
-                  outputs=[Output(value=File("b"), through=ThroughFile("b"))], command=["convert", "a", "b"],
-                  entrypoint=None, workdir=None)
-s.actions.append(foo_a_to_b)
-bar_b_to_c = Exec(image_name="bar", inputs=[Input(value=File("b"), through=ThroughFile("b"))],
-                  outputs=[Output(value=File("c"), through=ThroughFile("c"))], command=["postprocess", "b", "c"],
-                  entrypoint=None, workdir=None)
-s.actions.append(bar_b_to_c)
+s = Spec(spec_version=(1, 0), description="python-base examnple")
+
+GRAPHVIZ="trivial-graphviz"
+
+s.build_image(GRAPHVIZ, context_path="containers/graphviz")
+
+def dot2png(s: Spec, source: [str, PurePosixPath], output: [str, PurePosixPath]):
+    source_path = PurePosixPath(source)
+    output_path = PurePosixPath(output)
+    s.exec(image_name=GRAPHVIZ,
+           inputs=[Input(value=File(str(source_path)), through=ThroughFile(source_path.name))],
+           outputs=[Output(value=File(str(output_path)), through=ThroughFile(output_path.name))],
+           command=["dot", "-Tpng", "-o", str(output_path.name), str(source_path.name)])
+
+dot2png(s, "examples/python-base/example.dot", "examples/python-base/mnb-generated/example.png")
 
 print_spec_json(s)
