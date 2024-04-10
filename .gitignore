@@ -25,7 +25,8 @@ target
 
 dependency-reduced-pom.xml
 
-mnb-main/venv/
+venv
+
 .mnb.d
 
 __pycache__
