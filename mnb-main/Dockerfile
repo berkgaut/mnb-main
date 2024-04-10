@@ -17,3 +17,4 @@ RUN mkdir /mnb/lib/scripts
 ADD scripts/* /mnb/lib/scripts/
 
 ADD mnb/*.py /mnb/lib/mnb/
+#TODO: install git for git-python

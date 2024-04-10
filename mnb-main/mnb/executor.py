@@ -484,7 +484,7 @@ class PlanExecutor:
 
     def __init__(self, plan):
         self.plan = plan
-        required_major, required_minor = self.plan.required_api
+        required_major, required_minor = self.plan.spec_version
         if required_major > VERSION_MAJOR or (required_major == VERSION_MAJOR and required_minor > VERSION_MINOR):
             raise UnsupportedVersionException(required_major, required_minor)
         self._prepare()
