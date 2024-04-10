@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Optional
 
 from jsonschema.validators import validate
@@ -6,17 +5,18 @@ import json
 import spec
 
 from errors import ParseError
-import libdir
+import common
 
-with (libdir.get_path() / "spec-schema.json").open("r") as schema_file:
+with (common.get_lib_path() / "spec-schema.json").open("r") as schema_file:
     schema = json.load(schema_file)
 
 def parse_spec(parsed_json) -> spec.Spec:
     validate(parsed_json, schema)
     [maj_str, min_str] = parsed_json['spec_version'].split('.')
     spec_version = (int(maj_str), int(min_str))
+    description = parsed_json.get('description')
     actions = map(parse_action, parsed_json['actions'])
-    return spec.Spec(spec_version, list(actions))
+    return spec.Spec(spec_version, list(actions), description)
 
 def parse_action(parsed_json) -> 'spec.Action':
     if 'pull_image' in parsed_json:

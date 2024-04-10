@@ -114,7 +114,8 @@
           }
         ]
       }
-    }
+    },
+    "description": {"type": "string"}
   },
   "definitions": {
     "value": {
