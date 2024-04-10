@@ -12,9 +12,11 @@ StringOrPath = Union[str, PurePosixPath]
 class Spec:
     spec_version: Tuple[int, int]
     actions: List['Action']
+    description: Optional[str]
 
-    def __init__(self, spec_version: Tuple[int, int], actions: Optional[List['Action']] = None):
+    def __init__(self, spec_version: Tuple[int, int], actions: Optional[List['Action']] = None, description: Optional[str] = None):
         self.spec_version = spec_version
+        self.description = description
         if actions is None:
             self.actions = list()
         else:

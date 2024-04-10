@@ -30,3 +30,6 @@ mnb-main/venv/
 
 __pycache__
 *.pyc
+
+mnb-generated
+.mnb
