@@ -19,4 +19,4 @@ docker run \
   --rm \
   bberkgaut/mnb:0.7.0 \
   --rootabspath "$(pwd -P)" \
-  $*
+  "$@"
