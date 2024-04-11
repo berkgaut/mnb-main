@@ -202,6 +202,7 @@ def execute_exec(action: Exec, context: Context):
         action.image_name,
         command=action.command,
         mounts=all_mounts,
+        environment=environment,
         working_dir=str(workdir),
         detach=True,
         stdin_open=True)
