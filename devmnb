@@ -5,11 +5,18 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-# Determine directory where devmnb is located
-MNB_DIR=$(cd -P "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)
+# Determine directory where devmnb is located (mnb workspace root)
+ROOT_ABS_PATH=$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1 && pwd)
+
+# Determine the location of devmnb script (mnb-main source directory)
+# In this case we resolve symlinks to the script, but with only one level of indirection
+# (this is because macos's readlink does not have -f option)
+THIS_SCRIPT=$(readlink -- "$0" || echo "$0")
+MNB_DIR=$(cd -P -- "$(dirname -- "$THIS_SCRIPT")" > /dev/null 2>&1 && pwd -P)
 echo "MNB_DIR=${MNB_DIR}"
 SRC_DIR="${MNB_DIR}/src"
 
+# python or python3?
 if which python3 > /dev/null
 then
   PYTHON=python3
@@ -22,6 +29,7 @@ else
 fi
 echo "PYTHON=${PYTHON}"
 
+# Create virtualenv if it does not exist
 VENV_DIR="${MNB_DIR}/venv"
 if [ ! -d "${VENV_DIR}" ]
 then
@@ -50,6 +58,7 @@ source "${VENV_ACTIVATE}"
 echo "Install requirements"
 ${PYTHON} -m pip install -r "${SRC_DIR}/mnb-core/requirements.txt"
 
+# Same as mnb script
 if [ -S /var/run/docker.sock ]
 then
 	export DOCKER_HOST=
@@ -63,4 +72,4 @@ echo "PYTHONPATH=${PYTHONPATH}"
 
 export MNB_LIB="${SRC_DIR}/mnb-core/lib"
 
-python3 "${SRC_DIR}/mnb-core/main.py" --dev-mode --rootabspath "${MNB_DIR}" "$@"
+python3 "${SRC_DIR}/mnb-core/main.py" --dev-mode --rootabspath "${ROOT_ABS_PATH}" "$@"
