@@ -1,0 +1,1 @@
+MNB_VERSION_STR="0.9.3"

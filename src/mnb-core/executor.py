@@ -5,9 +5,11 @@ import sys
 import threading
 from pathlib import PurePosixPath, Path, PurePath, PosixPath, PureWindowsPath, WindowsPath
 import git
+import chevron
+import mnb_version
 
 import spec_parser
-from common import CommandLineOptions
+from common import CommandLineOptions, get_lib_path
 
 MNB_RUN = PurePosixPath("/mnb/run")
 
@@ -45,8 +47,6 @@ class Context:
             self.context_absolute_path_for_mnb = host_path_class(cliopts.rootabspath)
         else:
             self.context_absolute_path_for_mnb = PosixPath("/mnb/run")
-
-        #self.config_file_path = self.context_absolute_path_for_mnb / cliopts.config_file
 
 def execute_spec(spec: Spec, context: Context):
     if spec.description:
@@ -88,10 +88,10 @@ def execute_build_image(action: BuildImage, context: Context):
         origin.fetch()
         context.fancy_output.success(f"fetched to {repo_path}")
         repo.git.checkout(action.from_git.rev)
-        context_path = context.context_absolute_path_on_host / ".mnb" / "repo" / repo_dir / action.context_path
+        context_path = context.context_absolute_path_for_mnb / ".mnb" / "repo" / repo_dir / action.context_path
     else:
-        context_path = context.context_absolute_path_on_host / action.context_path
-    context.fancy_output.phase(f"Build image {action.image_name}")
+        context_path = context.context_absolute_path_for_mnb / action.context_path
+    context.fancy_output.phase(f"Build image {action.image_name} using {context_path}")
     (image, stream) = context.client.images.build(tag=action.image_name,
                                                   path=str(context_path),
                                                   dockerfile=action.dockerfile_path,
@@ -300,31 +300,58 @@ def ensure_writable_dir(param):
 
 def update(cliopts: CommandLineOptions):
     context = Context(cliopts)
-    workspace_file_name = "mnb-workspace.json"
-    workspace_path = context.context_absolute_path_for_mnb / workspace_file_name
-    if not workspace_path.exists():
-        context.fancy_output.failure(f"Workspace file {workspace_file_name} not found")
+    mnb_file_name = "mnb.json"
+    mnb_file_path = context.context_absolute_path_for_mnb / mnb_file_name
+    if not mnb_file_path.exists():
+        context.fancy_output.failure(f"mnb file {mnb_file_name} not found")
         sys.exit(1)
-    with workspace_path.open('rb') as workspace_file:
-        workspace_json = json.load(workspace_file)
-        if 'description' in workspace_json:
-            context.fancy_output.phase(workspace_json['description'])
-        spec_version = workspace_json.get('spec_version')
-        for generator_elem in workspace_json.get('generators', []):
-            if 'include' in generator_elem:
-                include_path = generator_elem.get('include').get('path')
-                with (context.context_absolute_path_for_mnb / include_path).open('r') as generator_file:
-                    generator = spec_parser.parse_spec(json.load(generator_file))
-                    generator_output = execute_spec(generator, context)
-                    spec = spec_parser.parse_spec(json.loads(generator_output))
-                    execute_spec(spec, context)
-            elif 'generator' in generator_elem:
-                generator_json = generator_elem.get('generator')
-                if 'spec_version' not in generator_json:
-                    generator_json['spec_version'] = spec_version
-                generator = spec_parser.parse_spec(generator_json)
-                generator_output = execute_spec(generator, context)
-                spec = spec_parser.parse_spec(json.loads(generator_output))
-                execute_spec(spec, context)
-            else:
-                raise Exception(f"Invalid generator element {json.dumps(generator_elem, indent=2)}")
+    with mnb_file_path.open('r') as mnb_file:
+        mnb_file_json = json.load(mnb_file)
+        generator = spec_parser.parse_spec(mnb_file_json)
+        generator_output = execute_spec(generator, context)
+        spec = spec_parser.parse_spec(json.loads(generator_output))
+        execute_spec(spec, context)
+
+def init(cliopts):
+    context = Context(cliopts)
+    workspace_file_name = "mnb.json"
+    workspace_path = context.context_absolute_path_for_mnb / workspace_file_name
+    if workspace_path.exists():
+        context.fancy_output.failure(f"Workspace file {workspace_file_name} already exists")
+        sys.exit(1)
+    workspace = {
+        "description": "MNB workspace",
+        "spec_version": "1.0",
+        "generators": []
+    }
+    with workspace_path.open('w') as workspace_file:
+        json.dump(workspace, workspace_file, indent=2)
+    context.fancy_output.success(f"Workspace file {workspace_file_name} created")
+    mnb_sh_file_name = "mnb"
+    mnb_sh_path = context.context_absolute_path_for_mnb / mnb_sh_file_name
+    if mnb_sh_path.exists():
+        context.fancy_output.failure(f"Script file {mnb_sh_file_name} already exists")
+        sys.exit(1)
+    template_params = {
+        "MNB_VERSION_STR": mnb_version.MNB_VERSION_STR,
+    }
+    create_mnb_sh_from_template(mnb_sh_path, template_params)
+    context.fancy_output.success(f"Script file {mnb_sh_file_name} created")
+
+def scripts(cliopts):
+    context = Context(cliopts)
+    mnb_sh_file_name = "mnb"
+    mnb_sh_path = context.context_absolute_path_for_mnb / mnb_sh_file_name
+    template_params = {
+        "MNB_VERSION_STR": mnb_version.MNB_VERSION_STR,
+    }
+    create_mnb_sh_from_template(mnb_sh_path, template_params)
+
+def create_mnb_sh_from_template(mnb_sh_path, template_params):
+    moustache_template = get_lib_path() / "mnb.sh.moustache"
+    with moustache_template.open('r') as template_file:
+        template = template_file.read()
+        with mnb_sh_path.open('w') as mnb_sh_file:
+            content = chevron.render(template, template_params)
+            mnb_sh_file.write(content)
+    mnb_sh_path.chmod(0o755)

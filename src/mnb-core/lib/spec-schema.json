@@ -49,6 +49,21 @@
                         "value": { "type": "string" }
                       }
                     }
+                  },
+                  "from_git": {
+                    "type": "object",
+                    "required": [
+                      "repo"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "repo": {
+                        "type": "string"
+                      },
+                      "rev": {
+                        "type": "string"
+                      }
+                    }
                   }
                 }
               }

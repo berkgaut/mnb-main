@@ -10,7 +10,7 @@ ROOT_ABS_PATH=$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1 && pwd)
 
 # Determine the location of devmnb script (mnb-main source directory)
 # In this case we resolve symlinks to the script, but with only one level of indirection
-# (this is because macos's readlink does not have -f option)
+# (this is because macos readlink does not have -f option)
 THIS_SCRIPT=$(readlink -- "$0" || echo "$0")
 MNB_DIR=$(cd -P -- "$(dirname -- "$THIS_SCRIPT")" > /dev/null 2>&1 && pwd -P)
 echo "MNB_DIR=${MNB_DIR}"
@@ -58,7 +58,7 @@ source "${VENV_ACTIVATE}"
 echo "Install requirements"
 ${PYTHON} -m pip install -r "${SRC_DIR}/mnb-core/requirements.txt"
 
-# Same as mnb script
+# The rest of this script is similar to mnb
 if [ -S /var/run/docker.sock ]
 then
 	export DOCKER_HOST=

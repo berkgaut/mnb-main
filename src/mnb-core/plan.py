@@ -36,6 +36,8 @@ def toposort_actions(spec: Spec) -> List[Action]:
                 value_node = ValueNode(value)
                 images[action.image_name] = value_node
                 images[action.image_name].producer = action
+                action_node = ActionNode(action)
+                action_nodes.add(action_node)
             else:
                 raise ImageSpecConflict(action, prev_definition=images[action.image_name].producer)
 
