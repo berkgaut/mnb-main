@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# !!!GENERATED - DO NOT EDIT!!!
+#
+# Startup script for mnb utility, see https://github.com/berkgaut/mnb-main
+#
+
+# Figure out script absolute location, which would be the path to the mnb workspace.
+#
+# In general, determining script location is non-trivial, but we do several simplifying assumptions:
+# - This script would never be sourced, only executed
+# - Symlinks are not resolved, i.e. if the script or the containing directory is a symlink,
+#   then the path to mnb workspace would contain that symblink
+
+ROOT_ABS_PATH=$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1 && pwd)
+
+if [ -S /var/run/docker.sock ]
+then
+    DOCKER_HOST=
+    docker_sock_mount="-v /var/run/docker.sock:/var/run/docker.sock"
+else
+    DOCKER_HOST=tcp://host.docker.internal:2375
+    docker_sock_mount=
+fi
+
+docker run \
+  --env DOCKER_HOST \
+  ${docker_sock_mount} \
+  -v "${PWD}:/mnb/run" \
+  --rm \
+  bberkgaut/mnb:0.9.2 \
+  --rootabspath "$ROOT_ABS_PATH" \
+  "$@"

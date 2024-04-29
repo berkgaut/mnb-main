@@ -1,11 +1,17 @@
 from spec import *
-from spec_json import print_spec_json
+from spec_json import *
+import sys
 
-s = Spec(spec_version=(1, 0), description="python-base examnple")
+# Note that the output is sent to stderr, as stdout is used to output spec JSON
+print("Hello from Python script which uses Pythjon DSL to generate mnb spec!", file=sys.stderr)
+
+s = Spec(spec_version=(1, 0), description="python-base example")
 
 GRAPHVIZ="trivial-graphviz"
 
-s.build_image(GRAPHVIZ, context_path="containers/graphviz")
+s.build_image(GRAPHVIZ,
+              context_path="containers/graphviz",
+              from_git=FromGit(repo="https://github.com/berkgaut/mnb-main.git", rev="master"))
 
 def dot2png(s: Spec, source: [str, PurePosixPath], output: [str, PurePosixPath]):
     source_path = PurePosixPath(source)
@@ -15,6 +21,6 @@ def dot2png(s: Spec, source: [str, PurePosixPath], output: [str, PurePosixPath])
            outputs=[Output(value=File(str(output_path)), through=ThroughFile(output_path.name))],
            command=["dot", "-Tpng", "-o", str(output_path.name), str(source_path.name)])
 
-dot2png(s, "examples/python-base/example.dot", "examples/python-base/mnb-generated/example.png")
+dot2png(s, "example.dot", "mnb-generated/example.png")
 
 print_spec_json(s)
