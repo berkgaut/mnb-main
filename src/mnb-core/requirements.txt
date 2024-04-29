@@ -2,6 +2,6 @@ docker==7.0.0
 gitignore-parser==0.0.8
 jsonschema==4.17.3
 console==0.9907
-GitPython==3.1.31
+GitPython==3.1.41
 chevron==0.14.0
 
