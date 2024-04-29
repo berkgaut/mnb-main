@@ -17,10 +17,18 @@ With mnb the only requirements are Docker and a standard shell (bash or cmd.exe)
 
 To create mnb startup script `mnb`
 
-```bash
-mkdir mnb-demo
-cd mnb-demo
-docker run -v $PWD:/mnb/run --rm bberkgaut/mnb:latest scripts
+```text
+$ mkdir mnb-demo && cd mnb-demo
+
+$ docker run bberkgaut/mnb:latest
+
+To create mnb workspace and startup scripts, run:
+  docker run -v $(pwd):/mnb/run -v /var/run/docker.sock:/var/run/docker.sock --rm bberkgaut/mnb:latest init
+
+$ docker run -v $(pwd):/mnb/run -v /var/run/docker.sock:/var/run/docker.sock --rm bberkgaut/mnb:latest init
+
+Workspace file mnb.json created
+Script file mnb created
 ```
 
 ask `mnb` to generate and execute a plan:
