@@ -1,0 +1,15 @@
+{
+  "spec_version": "1.0",
+  "description": "Generate spec spec",
+  "actions": [
+    {"pull_image": {
+      "image_name": "bberkgaut/mnb-spec-python:latest"
+    }},
+    {"exec": {
+      "image_name": "bberkgaut/mnb-spec-python:latest",
+      "command": ["python3", "mnb-spec.py"],
+      "workdir": "context",
+      "inputs": [{"value": {"dir": {"path": "."}}, "through": {"dir": {"path": "context"}}}]
+    }}
+  ]
+}
