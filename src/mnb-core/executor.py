@@ -101,6 +101,9 @@ def execute_build_image(action: BuildImage, context: Context):
             context.fancy_output.progress(i['stream'], prefix=f"build {action.image_name}: ")
         elif 'aux' in i:
             context.fancy_output.success(str(i['aux']), prefix=f"build {action.image_name}: ")
+    for tag in action.extra_tags or []:
+        image.tag(tag)
+        context.fancy_output.progress(f"tagged {action.image_name} as {tag}", prefix=f"build {action.image_name}: ")
 
 def execute_pull_image(action: PullImage, context: Context):
     context.fancy_output.phase(f"Pull image {action.image_name}")

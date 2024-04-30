@@ -27,6 +27,8 @@ def action_to_json(action: spec.Action):
             action_json['build_image']['build_args'] = [{"name": key, "value": value} for (key, value) in action.build_args.items()]
         if action.from_git:
             action_json['build_image']['from_git'] = {"repo": action.from_git.repo, "rev": action.from_git.rev}
+        if action.extra_tags:
+            action_json['build_image']['extra_tags'] = action.extra_tags
         return action_json
     elif isinstance(action, spec.Exec):
         action_json = {"exec": {

@@ -30,7 +30,8 @@ def parse_action(parsed_json) -> 'spec.Action':
         dockerfile_path = action_json.get('dockerfile_path')
         build_args = { e['name']: e['value'] for e in action_json.get('build_args',[])}
         from_git = parse_from_git(action_json.get('from_git'))
-        return spec.BuildImage(image_name, context_path, build_args, dockerfile_path, from_git)
+        extra_tags = action_json.get('extra_tags')
+        return spec.BuildImage(image_name, context_path, build_args, dockerfile_path, from_git, extra_tags)
     elif 'exec' in parsed_json:
         action_json = parsed_json['exec']
         image_name = action_json['image_name']

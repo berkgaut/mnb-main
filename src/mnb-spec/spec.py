@@ -30,11 +30,13 @@ class Spec:
 
     def build_image(self,
                     image_name: ImageName,
+                    extra_tags: Optional[List[str]] = None,
                     context_path: Optional[StringOrPath] = None,
                     build_args: Optional[dict[str, str]] = None,
                     dockerfile_path: Optional[str] = None,
                     from_git: Optional['FromGit'] = None) -> 'BuildImage':
         action = BuildImage(image_name,
+                            extra_tags=extra_tags,
                             context_path=str(context_path) if context_path is not None else ".",
                             build_args=build_args if build_args is not None else dict(),
                             dockerfile_path=dockerfile_path,
@@ -141,18 +143,21 @@ class BuildImage:
     build_args: dict[str, str]
     dockerfile_path: Optional[str]
     from_git: Optional['FromGit']
+    extra_tags: list[str]
 
     def __init__(self,
                  image_name: ImageName,
                  context_path: str,
                  build_args: Dict[str, str],
                  dockerfile_path: Optional[str] = None,
-                 from_git: Optional['FromGit'] = None):
+                 from_git: Optional['FromGit'] = None,
+                 extra_tags: Optional[List[str]] = None):
         self.image_name = image_name
         self.context_path = context_path
         self.from_git = from_git
         self.dockerfile_path = dockerfile_path
         self.build_args = build_args
+        self.extra_tags = extra_tags
 
 
 class FromGit:

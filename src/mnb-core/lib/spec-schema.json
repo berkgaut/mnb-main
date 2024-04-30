@@ -50,6 +50,10 @@
                       }
                     }
                   },
+                  "extra_tags": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
                   "from_git": {
                     "type": "object",
                     "required": [
