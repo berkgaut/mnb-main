@@ -4,6 +4,12 @@ from graphlib import TopologicalSorter
 from errors import ImageSpecConflict, MissingImageSpec, UnexpectedValueType, ProducerConflict
 from spec import *
 
+# could be rewritten using data-pipeline-like approach
+# collect facts like "value X produced by action Y", group by value, then toposort.
+# Values could be represented as pairs (type, id), for example ("image", "bash:5.2"), ("file", "mnb-generated/file.txt")
+
+# !!! == or I could just implement dictionary/set key protocol for values. This protocol should be hash, eq, if I remember correctly
+
 class ValueNode:
     value: Union[File, Dir, Image]
     consumers: set[Action]
