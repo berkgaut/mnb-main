@@ -7,7 +7,6 @@ def get_lib_path() -> Path:
 
 class CommandLineOptions:
     rootabspath: Optional[str]
-    #config_file: str
     windows_host: bool
     dev_mode: bool
     subcommand: Optional[str]

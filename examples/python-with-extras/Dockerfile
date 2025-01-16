@@ -1,3 +1,6 @@
-FROM bberkgaut/mnb-spec-python
+FROM bberkgaut/mnb-spec-python:latest
 
-RUN pip3 install marko
+ADD requirements.txt /mnb/gen/requirements.txt
+RUN pip install -r /mnb/gen/requirements.txt
+
+

@@ -23,9 +23,9 @@ $ mkdir mnb-demo && cd mnb-demo
 $ docker run bberkgaut/mnb:latest
 
 To create mnb workspace and startup scripts, run:
-  docker run -v $(pwd):/mnb/run -v /var/run/docker.sock:/var/run/docker.sock --rm bberkgaut/mnb:latest init
+  docker run -v $(pwd):/mnb/run --rm bberkgaut/mnb:latest init
 
-$ docker run -v $(pwd):/mnb/run -v /var/run/docker.sock:/var/run/docker.sock --rm bberkgaut/mnb:latest init
+$ docker run -v $(pwd):/mnb/run --rm bberkgaut/mnb:latest init
 
 Workspace file mnb.json created
 Script file mnb created

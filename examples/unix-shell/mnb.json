@@ -1,15 +1,18 @@
 {
   "spec_version": "1.0",
-  "description": "Generate spec spec",
+  "description": "Run mnb-spec.py using mnb-spec-python image",
   "actions": [
-    {"pull_image": {
+    { "pull_image": {
       "image_name": "bberkgaut/mnb-spec-python:latest"
     }},
     {"exec": {
       "image_name": "bberkgaut/mnb-spec-python:latest",
-      "command": ["python3", "mnb-spec.py"],
+      "command": ["python", "mnb-spec.py"],
       "workdir": "context",
-      "inputs": [{"value": {"dir": {"path": "."}}, "through": {"dir": {"path": "context"}}}]
+      "inputs": [
+        { "value": {"dir": {"path": "."}},
+          "through": {"dir": {"path": "context"}}}
+      ]
     }}
   ]
 }

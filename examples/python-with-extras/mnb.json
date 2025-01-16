@@ -1,0 +1,16 @@
+{
+  "spec_version": "1.0",
+  "description": "Generate spec",
+  "actions": [
+    {"build_image": {
+      "image_name": "bberkgaut/python-with-extras-example",
+      "context_path": "."
+    }},
+    {"exec": {
+      "image_name": "bberkgaut/python-with-extras-example",
+      "command": ["python3", "mnb-spec.py"],
+      "workdir": "context",
+      "inputs": [{"value": {"dir": {"path": "."}}, "through": {"dir": {"path": "context"}}}]
+    }}
+  ]
+}

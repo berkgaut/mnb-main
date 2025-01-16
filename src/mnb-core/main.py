@@ -40,7 +40,7 @@ def main():
 
 def print_initial_help():
     print("To create mnb workspace and startup scripts, run:")
-    print("  docker run -v $(pwd):/mnb/run -v /var/run/docker.sock:/var/run/docker.sock --rm bberkgaut/mnb:latest init")
+    print("  docker run -v $(pwd):/mnb/run --rm bberkgaut/mnb:latest init")
 
 if __name__ == "__main__":
     main()

@@ -9,32 +9,24 @@
 # In general, determining script location is non-trivial, but we do several simplifying assumptions:
 # - This script would never be sourced, only executed
 # - Symlinks are not resolved, i.e. if the script or the containing directory is a symlink,
-#   then the path to mnb workspace would contain that symlink
+#   then the path to mnb workspace would contain that symblink
 
 ROOT_ABS_PATH=$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1 && pwd)
 
-# Determine DOCKER_HOST and whether to mount docker.sock
 if [ -S /var/run/docker.sock ]
 then
-    DOCKER_HOST=unix:///var/run/docker.sock
+    DOCKER_HOST=
     docker_sock_mount="-v /var/run/docker.sock:/var/run/docker.sock"
-elif [ -S $HOME/.docker/run/docker.sock ]
-then
-    DOCKER_HOST=unix:///var/run/docker.sock
-    docker_sock_mount="-v $HOME/.docker/run/docker.sock:/var/run/docker.sock"
 else
     DOCKER_HOST=tcp://host.docker.internal:2375
     docker_sock_mount=
 fi
 
-# Run docker
 docker run \
-  --tty \
-  --interactive \
   --env DOCKER_HOST \
   ${docker_sock_mount} \
   -v "${PWD}:/mnb/run" \
   --rm \
-  bberkgaut/mnb:0.9.5 \
+  bberkgaut/mnb:latest \
   --rootabspath "$ROOT_ABS_PATH" \
   "$@"

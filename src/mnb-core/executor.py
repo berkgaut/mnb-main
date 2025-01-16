@@ -4,6 +4,8 @@ import re
 import sys
 import threading
 from pathlib import PurePosixPath, Path, PurePath, PosixPath, PureWindowsPath, WindowsPath
+from shutil import copy
+
 import git
 import chevron
 import mnb_version
@@ -24,14 +26,11 @@ from errors import UnexpectedActionType, IncompatibleValueAndThrough, Conflictin
 from plan import toposort_actions
 
 class Context:
-    client: DockerClient
     fancy_output: FancyOutput
     context_absolute_path_on_host: PurePath
     context_absolute_path_for_mnb: Path
-    #config_file_path: Path
 
     def __init__(self, cliopts: CommandLineOptions):
-        self.client = from_env()
         self.fancy_output = FancyOutput(sys.stdout)
 
         if cliopts.windows_host:
@@ -72,6 +71,7 @@ def execute_action(action, context):
 
 
 def execute_build_image(action: BuildImage, context: Context):
+    client = from_env()
     if action.from_git:
         context.fancy_output.phase(f"fetch from git repo {action.from_git.repo} rev {action.from_git.rev}")
         repo_dir = re.sub("[^a-zA-Z0-9.-]+", "-", action.from_git.repo)
@@ -92,10 +92,10 @@ def execute_build_image(action: BuildImage, context: Context):
     else:
         context_path = context.context_absolute_path_for_mnb / action.context_path
     context.fancy_output.phase(f"Build image {action.image_name} using {context_path}")
-    (image, stream) = context.client.images.build(tag=action.image_name,
-                                                  path=str(context_path),
-                                                  dockerfile=action.dockerfile_path,
-                                                  buildargs=action.build_args)
+    (image, stream) = client.images.build(tag=action.image_name,
+                                          path=str(context_path),
+                                          dockerfile=action.dockerfile_path,
+                                          buildargs=action.build_args)
     for i in stream:
         if 'stream' in i:
             context.fancy_output.progress(i['stream'], prefix=f"build {action.image_name}: ")
@@ -106,6 +106,7 @@ def execute_build_image(action: BuildImage, context: Context):
         context.fancy_output.progress(f"tagged {action.image_name} as {tag}", prefix=f"build {action.image_name}: ")
 
 def execute_pull_image(action: PullImage, context: Context):
+    client = from_env()
     context.fancy_output.phase(f"Pull image {action.image_name}")
     parts = action.image_name.split(":")
     repository = parts[0]
@@ -113,11 +114,12 @@ def execute_pull_image(action: PullImage, context: Context):
         tag = parts[1]
     else:
         tag = None
-    for line in context.client.api.pull(repository, tag=tag, stream=True, decode=True):
+    for line in client.api.pull(repository, tag=tag, stream=True, decode=True):
         #context.fancy_output.progress(f"{line.get('status', '')} {line.get('progress','')}")
         context.fancy_output.progress(f"{line}", prefix=f"pull {action.image_name}: ")
 
 def execute_exec(action: Exec, context: Context):
+    client = from_env()
     context.fancy_output.phase(f"exec {action.image_name} {action.command}")
     mounts: Dict[str, Mount] = dict()
     stdin_inputs = [] # stdin sources (would be concatenated together)
@@ -201,7 +203,7 @@ def execute_exec(action: Exec, context: Context):
     else:
         workdir = MNB_RUN
     # create container, but do not start yet (we need to attach to it first)
-    container = context.client.containers.create(
+    container = client.containers.create(
         action.image_name,
         command=action.command,
         mounts=all_mounts,
@@ -250,12 +252,10 @@ def execute_exec(action: Exec, context: Context):
     # copy output files
     # TODO: use more efficient file copy
     for file_output in file_outputs:
-        with Path(temp_dir_for_mnb / file_output.through.path).open('rb') as src:
-            data = src.read()
-            output_path = context.context_absolute_path_for_mnb / file_output.value.path
-            ensure_writable_dir(output_path.parent)
-            with output_path.open('wb') as dst:
-                dst.write(data)
+        tmp_output_path = temp_dir_for_mnb / file_output.through.path
+        output_path = context.context_absolute_path_for_mnb / file_output.value.path
+        ensure_writable_dir(output_path.parent)
+        copy(tmp_output_path, output_path)
     for stdout_output in stdout_outputs:
         output_path = context.context_absolute_path_for_mnb / stdout_output.value.path
         ensure_writable_dir(output_path.parent)
@@ -276,7 +276,6 @@ def socket_receiver(sock, stdout_stream, stderr_stream):
         if stream == -1:
             break
         received = read_exactly(sock, length)
-        #print(f"stream {stream}: {received.decode('utf-8')}")
         if stream == 1:
             stdout_stream.write(received)
         else:
@@ -290,7 +289,7 @@ def socket_sender(sock, stdin_stream):
             buffer = stdin_stream.read(n)
             if len(buffer) == 0:
                 break
-        # todo: use sendall
+        # TODO: use sendall
         sent = sock.send(buffer)
         buffer = buffer[sent:]
 
@@ -320,26 +319,26 @@ def init(cliopts):
     workspace_file_name = "mnb.json"
     workspace_path = context.context_absolute_path_for_mnb / workspace_file_name
     if workspace_path.exists():
-        context.fancy_output.failure(f"Workspace file {workspace_file_name} already exists")
-        sys.exit(1)
-    workspace = {
-        "description": "MNB workspace",
-        "spec_version": "1.0",
-        "generators": []
-    }
-    with workspace_path.open('w') as workspace_file:
-        json.dump(workspace, workspace_file, indent=2)
-    context.fancy_output.success(f"Workspace file {workspace_file_name} created")
+        context.fancy_output.progress(f"Workspace file {workspace_file_name} already exists, leaving it intact")
+    else:
+        workspace = {
+            "spec_version": "1.0",
+            "description": "Generate spec",
+            "actions": []
+        }
+        with workspace_path.open('w') as workspace_file:
+            json.dump(workspace, workspace_file, indent=2)
+        context.fancy_output.success(f"Workspace file {workspace_file_name} created")
     mnb_sh_file_name = "mnb"
     mnb_sh_path = context.context_absolute_path_for_mnb / mnb_sh_file_name
     if mnb_sh_path.exists():
-        context.fancy_output.failure(f"Script file {mnb_sh_file_name} already exists")
-        sys.exit(1)
-    template_params = {
-        "MNB_VERSION_STR": mnb_version.MNB_VERSION_STR,
-    }
-    create_mnb_sh_from_template(mnb_sh_path, template_params)
-    context.fancy_output.success(f"Script file {mnb_sh_file_name} created")
+        context.fancy_output.progress(f"Script file {mnb_sh_file_name} already exists, leaving it intact")
+    else:
+        template_params = {
+            "MNB_VERSION_STR": mnb_version.MNB_VERSION_STR,
+        }
+        create_mnb_sh_from_template(mnb_sh_path, template_params)
+        context.fancy_output.success(f"Script file {mnb_sh_file_name} created")
 
 def scripts(cliopts):
     context = Context(cliopts)

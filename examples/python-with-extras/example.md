@@ -1,6 +1,6 @@
 # GraphViz+Markdown via mnb
 
-In this example `mnb` realizes some smartness out of Markdown and GraphViz.
+In this example `mnb` brings some extra smartness to Markdown+GraphViz combo.
 
 Generator looks through Markdown files and tries to identify images which should be generated from GraphViz .dot files.
 
@@ -8,18 +8,18 @@ For example, if there is a reference to image fig01.png, and there is a file fig
 then fig01.png would be generated from fig01.dot.
 
 ```markdown
-![Figure 1](fig01.png)
+![Figure 1](mnb-generated/fig01.png)
 ```
 
-![Figure 1](fig01.png)
+![Figure 1](mnb-generated/fig01.png)
 
 ## Inline GraphViz
 
 If an image reference is immediately followed by code section with language `dot`,
 dot code is extracted and transformed into image
 
-![Figure 2](fig02.png)
-```dot opt=1 var=2 z=3
+![Figure 2](mnb-generated/fig02.png)
+```dot mnb.reify=fig02.dot
 // comment
 digraph Foo {
     node [shape=rectangle, fontsize=12, fontname="Helvetica", label="", color="lightgray", style=filled];
@@ -34,7 +34,7 @@ digraph Foo {
 
 ![fig03]
 
-[fig03]: generated/fig03.png
+[fig03]: mnb-generated/fig03.png
 
 ## Inline GraphViz as Image Definition
 
@@ -57,11 +57,10 @@ digraph Foo {
 
 "Creative use" of Markdown [link reference definitions](https://spec.commonmark.org/current/#link-reference-definition) to specify options
 
-
 Subdirectory to store generated images 
 ```markdown
-[mnb-graphviz:generated_dir]: generated
+[mnb-graphviz.option]: generated-dir "mnb-generated"
 ```
+[mnb-graphviz.option]: generated-dir "mnb-generated"
 
-[mnb-graphviz:generated_dir]: generated
 

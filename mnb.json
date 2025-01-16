@@ -9,7 +9,7 @@
     }},
     {"exec": {
       "image_name": "mnb-spec-python-bootstrap",
-      "command": ["python3", "mnb-spec.py"],
+      "command": ["python", "mnb-spec.py"],
       "workdir": "context",
       "inputs": [{"value": {"dir": {"path": "."}}, "through": {"dir": {"path": "context"}}}]
     }}

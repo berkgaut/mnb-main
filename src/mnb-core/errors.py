@@ -8,7 +8,7 @@ class SpecSemanticError(Exception):
 
 class ImageSpecConflict(SpecSemanticError):
     def __init__(self, action: Action, prev_definition: Action):
-        super().__init__(f'Conflictiong definitions for image name {action.image_name}')
+        super().__init__(f'Conflicting definitions for image name {action.image_name}')
         self.action = action
         self.prev_definition = prev_definition
 

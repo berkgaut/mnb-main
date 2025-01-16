@@ -1,26 +1,25 @@
 from spec import *
-from spec_json import *
 import sys
 
-# Note that the output is sent to stderr, as stdout is used to output spec JSON
-print("Hello from Python script which uses Pythjon DSL to generate mnb spec!", file=sys.stderr)
+# If you want some output from the script, you can use stderr, as stdout is expected to contain JSON
+print("Hello from Python script which uses eDSL to generate mnb spec!", file=sys.stderr)
 
-s = Spec(spec_version=(1, 0), description="python-base example")
+with Spec(spec_version=(1, 0), description="python-base example") as s:
+    mnb_generated = PurePosixPath("mnb-generated")
 
-GRAPHVIZ="trivial-graphviz"
+    # Build GraphViz image
+    # In this example, the build context is pulled from a git repo
+    graphviz_image = s.build_image(
+        "trivial-graphviz",
+        context_path="containers/graphviz",
+        from_git=FromGit(repo="https://github.com/berkgaut/mnb-main.git", rev="master"))
 
-s.build_image(GRAPHVIZ,
-              context_path="containers/graphviz",
-              from_git=FromGit(repo="https://github.com/berkgaut/mnb-main.git", rev="master"))
+    def dot2png(source: StringOrPath, output: StringOrPath) -> None:
+        source_path = to_path(source)
+        output_path = to_path(output)
+        s.exec(graphviz_image,
+               inputs=[Input(value=File(source_path), through=ThroughFile(source_path.name))],
+               outputs=[Output(value=File(output_path), through=ThroughFile(output_path.name))],
+               command=["dot", "-Tpng", "-o", output_path.name, source_path.name])
 
-def dot2png(s: Spec, source: [str, PurePosixPath], output: [str, PurePosixPath]):
-    source_path = PurePosixPath(source)
-    output_path = PurePosixPath(output)
-    s.exec(image_name=GRAPHVIZ,
-           inputs=[Input(value=File(str(source_path)), through=ThroughFile(source_path.name))],
-           outputs=[Output(value=File(str(output_path)), through=ThroughFile(output_path.name))],
-           command=["dot", "-Tpng", "-o", str(output_path.name), str(source_path.name)])
-
-dot2png(s, "example.dot", "mnb-generated/example.png")
-
-print_spec_json(s)
+    dot2png("example.dot", mnb_generated / "example.png")
